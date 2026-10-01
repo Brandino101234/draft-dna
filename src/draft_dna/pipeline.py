@@ -1,7 +1,6 @@
 """Command-line entry point: `draft-dna <command>`.
 
-Commands are stubs until their phase lands; each raises a clear message
-rather than silently doing nothing.
+Commands for later phases are stubs that exit with a clear message.
 """
 
 from __future__ import annotations
@@ -51,9 +50,19 @@ def ingest(
 
 
 @app.command()
+def transform() -> None:
+    """Rebuild staging, crosswalk, modeled tables and DuckDB from raw (no network)."""
+    from draft_dna.build import transform as run_transform
+
+    run_transform()
+
+
+@app.command()
 def build() -> None:
-    """Rebuild all data from source (cached raw pulls are reused). Phase 1."""
-    raise typer.Exit(_not_yet("build", 1))
+    """Ingest every source (cached pages are reused) and run all transforms."""
+    from draft_dna.build import build_all
+
+    build_all()
 
 
 @app.command()

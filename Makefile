@@ -1,4 +1,4 @@
-.PHONY: setup lint typecheck test dq check data refresh
+.PHONY: setup lint typecheck test dq check data transform refresh
 
 setup:  ## Install the environment
 	uv sync
@@ -20,6 +20,9 @@ check: lint typecheck test
 
 data:  ## Rebuild all data from source (reuses cached raw pulls)
 	uv run draft-dna build
+
+transform:  ## Rebuild staging/modeled/DuckDB from cached raw data (no network)
+	uv run draft-dna transform
 
 refresh:  ## In-season update: new games, regrade, regenerate cards
 	uv run draft-dna refresh
