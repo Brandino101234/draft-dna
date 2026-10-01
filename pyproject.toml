@@ -60,3 +60,7 @@ markers = [
     "dq: data-quality tests that require a built database (run with `make dq`)",
 ]
 addopts = "-m 'not dq'"
+
+[[tool.mypy.overrides]]
+module = ["nba_api.*", "cbbpy.*", "lifelines.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
+ignore_missing_imports = true

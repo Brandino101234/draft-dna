@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from draft_dna.config import Settings, get_settings
-from draft_dna.ingest import bbref
+from draft_dna.ingest import barttorvik, bbref, nba_stats
 from draft_dna.ingest.fetcher import Fetcher
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
@@ -68,7 +68,25 @@ def run_bbref_players(settings: Settings | None = None) -> None:
     log.info("bbref player pages done (%d network requests)", f.network_requests)
 
 
+def run_barttorvik(settings: Settings | None = None) -> None:
+    s = settings or get_settings()
+    f = Fetcher(barttorvik.SOURCE, settings=s)
+    last_college = s.draft_classes.all_years()[-1]  # college season ending in the draft year
+    seasons = range(barttorvik.FIRST_SEASON, last_college + 1)
+    write_table(barttorvik.ingest_players(f, seasons), "raw", "barttorvik", "players", s)
+    write_table(barttorvik.ingest_teams(f, seasons), "raw", "barttorvik", "teams", s)
+
+
+def run_nba_api(settings: Settings | None = None) -> None:
+    s = settings or get_settings()
+    write_table(nba_stats.draft_history(s), "raw", "nba_api", "draft_history", s)
+    write_table(nba_stats.combine(s), "raw", "nba_api", "combine", s)
+    write_table(nba_stats.all_players(s), "raw", "nba_api", "all_players", s)
+
+
 STEPS = {
     "bbref-league": run_bbref_league,
     "bbref-players": run_bbref_players,
+    "barttorvik": run_barttorvik,
+    "nba-api": run_nba_api,
 }
