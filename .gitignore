@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Data (rebuilt from scripts via `make data`)
+/data/raw/
+/data/staging/
+/data/modeled/
+*.duckdb
+*.duckdb.wal
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Notebooks / OS
+.ipynb_checkpoints/
+.DS_Store
