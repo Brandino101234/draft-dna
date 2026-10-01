@@ -123,6 +123,9 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
         columns={"srs": "team_srs", "sos": "team_sos", "wins": "team_wins", "losses": "team_losses"}
     )
     out = out.merge(tc, on=["season", "school_slug"], how="left")
+    totals = teams[["season", "school_slug", "g", "mp", "fg", "fga", "fta", "tov"]]
+    totals = totals.rename(columns={c: f"tm_{c}" for c in ("g", "mp", "fg", "fga", "fta", "tov")})
+    out = derive_rates(out.merge(totals, on=["season", "school_slug"], how="left"))
 
     out = attach_bart_seasons(
         out, universe, read_table("staging", "barttorvik", "player_seasons", s)
@@ -151,6 +154,35 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
         on=["season", "bart_team"],
         how="left",
     )
+    return out
+
+
+def derive_rates(df: pd.DataFrame) -> pd.DataFrame:
+    """Usage and assist rate from player + team box totals (Basketball-Reference formulas).
+
+    Sports-Reference omits these for many pre-2010 seasons. Team minutes are missing
+    before 1999; they are approximated as games x 200 (no overtime), flagged in
+    `tm_mp_estimated`. Published values are kept when present; `*_source` says which.
+    """
+    out = df.copy()
+    out["tm_mp_estimated"] = out["tm_mp"].isna() & out["tm_g"].notna()
+    tm_mp = out["tm_mp"].fillna(out["tm_g"] * 200)
+    five = tm_mp / 5
+    usg = (
+        100
+        * (out["fga"] + 0.44 * out["fta"] + out["tov"])
+        * five
+        / (out["mp"] * (out["tm_fga"] + 0.44 * out["tm_fta"] + out["tm_tov"]))
+    )
+    ast = 100 * out["ast"] / ((out["mp"] / five) * out["tm_fg"] - out["fg"])
+    valid = out["mp"] >= 40  # rates are meaningless on tiny minutes
+    out["usg_pct_derived"] = usg.where(valid)
+    out["ast_pct_derived"] = ast.where(valid & (ast >= 0))
+    for col in ("usg_pct", "ast_pct"):
+        published = out[col] if col in out else pd.Series(pd.NA, index=out.index, dtype="Float64")
+        out[f"{col}_source"] = published.notna().map({True: "published", False: "derived"})
+        out.loc[published.isna() & out[f"{col}_derived"].isna(), f"{col}_source"] = pd.NA
+        out[col] = published.fillna(out[f"{col}_derived"])
     return out
 
 
