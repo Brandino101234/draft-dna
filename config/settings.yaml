@@ -1,0 +1,38 @@
+# Draft DNA project configuration.
+# Paths are relative to the repo root.
+
+paths:
+  raw: data/raw
+  staging: data/staging
+  modeled: data/modeled
+  database: data/draft_dna.duckdb
+  reports: reports
+
+draft_classes:
+  # 5+ NBA seasons: used for training and rolling-origin backtesting
+  training: [1996, 2021]
+  # 1-4 seasons: provisional grades, treated as censored careers
+  in_progress: [2022, 2025]
+  # just drafted: live projections only
+  live: [2026]
+
+current_nba_season: 2027  # season ending year (2026-27)
+
+# Polite fetching. Sports-Reference allows ~20 req/min; we stay well under.
+rate_limits:
+  sports_reference:
+    min_seconds_between_requests: 3.5
+  nba_api:
+    min_seconds_between_requests: 1.0
+  espn:
+    min_seconds_between_requests: 1.0
+  barttorvik:
+    min_seconds_between_requests: 2.0
+
+http:
+  timeout_seconds: 30
+  max_retries: 4
+  backoff_seconds: 10
+
+logging:
+  level: INFO

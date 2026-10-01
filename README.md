@@ -5,3 +5,11 @@ NBA draft analytics: historical comps from pre-draft data, floor/median/ceiling 
 **Headline question:** does *how* a prospect scores (shot location and style) predict NBA success better than traditional stats?
 
 Work in progress. See [ROADMAP.md](ROADMAP.md) for status and [DECISIONS.md](DECISIONS.md) for methodology choices.
+
+## Quickstart
+
+```bash
+make setup   # install environment (requires uv)
+make check   # lint, type check, unit tests
+make data    # rebuild all data from source (Phase 1+)
+```

@@ -1,0 +1,54 @@
+"""Command-line entry point: `draft-dna <command>`.
+
+Commands are stubs until their phase lands; each raises a clear message
+rather than silently doing nothing.
+"""
+
+from __future__ import annotations
+
+import typer
+
+from draft_dna.config import get_settings
+from draft_dna.logging_utils import get_logger, setup_logging
+
+app = typer.Typer(no_args_is_help=True, help="Draft DNA data and modeling pipeline.")
+log = get_logger(__name__)
+
+
+@app.callback()
+def main() -> None:
+    setup_logging(get_settings().logging.level)
+
+
+@app.command()
+def info() -> None:
+    """Print resolved configuration."""
+    s = get_settings()
+    log.info("database: %s", s.paths.database)
+    log.info(
+        "draft classes: training %s, in-progress %s, live %s",
+        s.draft_classes.training,
+        s.draft_classes.in_progress,
+        s.draft_classes.live,
+    )
+
+
+@app.command()
+def build() -> None:
+    """Rebuild all data from source (cached raw pulls are reused). Phase 1."""
+    raise typer.Exit(_not_yet("build", 1))
+
+
+@app.command()
+def refresh() -> None:
+    """Pull new games and regrade players during the season. Phase 7."""
+    raise typer.Exit(_not_yet("refresh", 7))
+
+
+def _not_yet(command: str, phase: int) -> int:
+    log.error("`%s` is implemented in Phase %d.", command, phase)
+    return 1
+
+
+if __name__ == "__main__":
+    app()
