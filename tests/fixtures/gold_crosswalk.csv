@@ -1,0 +1,67 @@
+# Hand-verified crosswalk cases (name variants, suffixes, accents, same-name pairs,
+# nicknames, pick-numbering mismatches, undrafted, high school, international).
+# Each value was checked against name, school and birthdate in its source.
+# Empty = must be unlinked. "?" = not asserted (cbb_id is filled once bios are pulled).
+bbref_id,nba_person_id,cbb_id,bart_pid,note
+dybanaj01,1643407,?,134465,2026 #1 pick
+carusal01,1627936,?,24216,undrafted
+reaveau01,1630559,?,46787,undrafted
+adebaba01,1628389,?,47569,Barttorvik lists 'Edrice Adebayo'
+wallabe01,1112,?,,undrafted 1996; Division II college
+hylanbo01,1630538,?,70684,Barttorvik lists "Nah'Shon Hyland"
+willibr01,1585,?,,same name as willibr03
+willibr03,1630314,?,66520,same name as willibr01
+carrica01,1642267,?,78198,Barttorvik lists 'Carlton Carrington'
+johnsch03,202419,?,1654,same name as johnsch04; LSU 2008-09 (6-11 C)
+johnsch04,203187,?,8383,same name as johnsch03
+wrighch01,202874,?,2799,same name as wrighch02 (Dayton)
+wrighch02,203203,?,16941,same name as wrighch01 (Georgetown)
+flaggco01,1642843,?,127998,2025 #1 pick
+saricda01,203967,?,,international; accents
+reedda01,1628432,?,31708,must not be confused with Willie Reed
+jonesde02,1627884,?,43564,undrafted; Jr.
+hernade01,1629608,?,46264,played college as Dewan Huell
+robindu01,1629130,?,36615,undrafted
+kanteen01,202683,?,,name change (Kanter -> Freedom); never played a college game
+jetereu01,200817,?,,"nickname 'Pooh'"
+vanvlfr01,1627832,?,26143,undrafted
+paytoga02,1627780,?,37314,suffix II
+trentga02,1629018,?,51371,suffix Jr.
+antetgi01,203507,?,,international
+arenagi01,2240,?,,2001: pick numbers differ between sources
+robingl02,203922,?,28109,suffix III
+seungha01,2775,?,,stats.nba.com name garbled ('Ha Ha')
+willija06,1631114,?,70269,Jalen vs Jaylin Williams (same class)
+jacksja02,1628991,?,51788,suffix Jr.
+willija07,1631119,?,73506,Jaylin vs Jalen Williams (same class)
+linje01,202391,?,2422,undrafted; no Barttorvik birthdate (matched by school)
+valanjo01,202685,?,,international; accents
+duranke01,201142,?,,college before Barttorvik coverage
+porteke02,1629645,?,66706,suffix Jr.
+bryanko01,977,?,,high school
+nancela02,1626204,?,20039,suffix Jr.
+jamesle01,2544,?,,high school
+doncilu01,1629029,?,,international; accents
+morrima03,202694,?,8822,twin (Marcus); stats.nba.com adds 'Sr.'
+willima03,200766,?,,same name as willima04
+willima04,201173,?,,same name as willima03
+morrima02,202693,?,4369,twin (Markieff); same birthdate as Marcus
+artesro01,1897,?,,name change (Ron Artest -> Metta World Peace)
+portemi01,1629008,?,51186,redshirt year shifts debut
+jamesmi01,2229,?,,same name as jamesmi02
+jamesmi02,1628455,?,14852,same name as jamesmi01
+sweetmi01,2552,?,,Mike vs Michael
+hilarne01,2403,?,,single name; accents
+jokicni01,203999,?,,international; accents
+porteot01,203490,?,19628,suffix Jr. (missing on Barttorvik)
+murraro01,2436,?,,"nickname 'Flip'"
+gilgesh01,1628983,?,51731,hyphenated
+hardati02,203501,?,14888,suffix Jr.
+mitchto02,203502,?,20151,same name and debut season as mitchto03 (North Texas)
+mitchto03,203183,?,14402,same name and debut season as mitchto02 (Alabama)
+hassetr01,2239,?,,2001: pick numbers differ between sources
+hasleud01,2617,?,,undrafted; college before 2008
+zhizhwa01,1917,?,,international; name order
+cartewe01,1628976,?,51785,suffix Jr.
+reedwi02,203186,?,7001,"must not be confused with Davon Reed"
+willizi01,1629627,zion-williamson-1,65847,

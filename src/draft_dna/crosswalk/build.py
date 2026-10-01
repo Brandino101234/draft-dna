@@ -123,7 +123,10 @@ def player_universe(s: Settings) -> pd.DataFrame:
         out["cbb_id"] = pd.NA
         out["colleges"] = out.get("college_name", pd.NA)
         out["birth_country"] = pd.NA
-    out["colleges"] = out["colleges"].fillna(out["college_name"])
+    index_colleges = index.set_index("bbref_id")["colleges"].replace("", pd.NA)
+    out["colleges"] = (
+        out["colleges"].fillna(out["college_name"]).fillna(out["bbref_id"].map(index_colleges))
+    )
     return out
 
 
