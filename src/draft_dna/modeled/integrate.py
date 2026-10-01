@@ -10,6 +10,7 @@ import pandas as pd
 
 from draft_dna.config import Settings
 from draft_dna.crosswalk.build import normalize_school, school_sim
+from draft_dna.crosswalk.names import normalize_name
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
 
@@ -123,27 +124,9 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
     )
     out = out.merge(tc, on=["season", "school_slug"], how="left")
 
-    bart = read_table("staging", "barttorvik", "player_seasons", s)
-    bart_cols = ["bart_pid", "season", "team", "usg", "ortg", "drtg", "bpm", "obpm", "dbpm",
-                 "orb_pct", "drb_pct", "ast_pct", "tov_pct", "blk_pct", "stl_pct", "ftr",
-                 "rim_made", "rim_att", "mid_made", "mid_att", "dunks_made", "dunks_att",
-                 "three_pm", "three_pa", "recruit_rating", "porpag", "min_pct"]  # fmt: skip
-    b = bart[bart_cols].rename(
-        columns={c: f"bart_{c}" for c in bart_cols if c not in ("bart_pid", "season")}
+    out = attach_bart_seasons(
+        out, universe, read_table("staging", "barttorvik", "player_seasons", s)
     )
-    out = out.merge(b, on=["bart_pid", "season"], how="left")
-    # A transfer's season can match the wrong Barttorvik row (two schools); keep the
-    # Barttorvik numbers only when the school agrees.
-    has_bart = out["bart_team"].notna()
-    same_school = [
-        school_sim(a, b) >= 80 or normalize_school(a) in normalize_school(b)
-        for a, b in zip(out["school_name"] if "school_name" in out else out["team_name_abbr"],
-                        out["bart_team"].fillna(""), strict=True)
-    ]  # fmt: skip
-    mismatch = has_bart & ~pd.Series(same_school, index=out.index)
-    bart_value_cols = [c for c in out.columns if c.startswith("bart_") and c != "bart_pid"]
-    out.loc[mismatch, bart_value_cols] = pd.NA
-    out["bart_school_mismatch"] = mismatch
     if table_path("modeled", "era", "ncaa_era", s).exists():
         era = read_table("modeled", "era", "ncaa_era", s).set_index("season")
         out["ts_rel"] = out["ts_pct"] - out["season"].map(era["ts_pct"])
@@ -169,6 +152,42 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
     return out
+
+
+BART_COLS = ["usg", "ortg", "drtg", "bpm", "obpm", "dbpm", "orb_pct", "drb_pct", "ast_pct",
+             "tov_pct", "blk_pct", "stl_pct", "ftr", "rim_made", "rim_att", "mid_made", "mid_att",
+             "dunks_made", "dunks_att", "three_pm", "three_pa", "recruit_rating", "porpag",
+             "min_pct"]  # fmt: skip
+
+
+def attach_bart_seasons(
+    seasons: pd.DataFrame, universe: pd.DataFrame, bart: pd.DataFrame
+) -> pd.DataFrame:
+    """Attach Barttorvik stats to each Sports-Reference season.
+
+    Barttorvik issues a new player ID at each school, so a transfer's earlier seasons
+    use other IDs. A Barttorvik row matches an SR season when the season and school
+    agree and either the ID is the crosswalk ID or the normalized name is identical.
+    """
+    names = universe.set_index("bbref_id")["player_name"].map(normalize_name)
+    sr = seasons.assign(_row=range(len(seasons)), _norm=seasons["bbref_id"].map(names))[
+        ["_row", "season", "bbref_id", "bart_pid", "_norm", "team_name_abbr"]
+    ]
+    b = bart.assign(_norm=bart["player_name"].map(normalize_name))
+    b = b[["bart_pid", "season", "team", "_norm", *BART_COLS]]
+    by_id = sr.merge(b.drop(columns=["_norm"]), on=["bart_pid", "season"])
+    by_name = sr.drop(columns=["bart_pid"]).merge(b, on=["season", "_norm"])
+    cand = pd.concat([by_id, by_name], ignore_index=True).drop_duplicates(["_row", "bart_pid"])
+    cand["_school"] = [
+        max(school_sim(a, t), 100.0 if normalize_school(a) in normalize_school(t) else 0.0)
+        for a, t in zip(cand["team_name_abbr"], cand["team"], strict=True)
+    ]
+    cand = cand[cand["_school"] >= 80].sort_values("_school").drop_duplicates("_row", keep="last")
+    cand = cand.rename(columns={"team": "bart_team", "bart_pid": "bart_season_pid"})
+    cand = cand.rename(columns={c: f"bart_{c}" for c in BART_COLS})
+    keep = ["_row", "bart_season_pid", "bart_team", *[f"bart_{c}" for c in BART_COLS]]
+    out = seasons.assign(_row=range(len(seasons))).merge(cand[keep], on="_row", how="left")
+    return out.drop(columns=["_row"])
 
 
 def combine(s: Settings) -> pd.DataFrame:

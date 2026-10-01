@@ -285,6 +285,27 @@ def _college_window(r: pd.Series) -> tuple[int, int]:
     return (int(fs) - 7, int(fs) - 1) if pd.notna(fs) else (0, -1)
 
 
+def best_school_sim(colleges: str | None, team: str) -> float:
+    """Best match of a Barttorvik team against any school in a comma-separated list."""
+    if not isinstance(colleges, str):
+        return 0.0
+    return max(school_sim(c.strip(), team) for c in colleges.split(","))
+
+
+def _resolve_transfer(hit: pd.DataFrame) -> int | None:
+    """Barttorvik issues a new player ID at each school. If several candidates have
+    non-overlapping season ranges, they are one transfer: keep the latest school's ID.
+    """
+    if len(hit) < 2:
+        return None
+    ordered = hit.sort_values("first_season")
+    if (
+        ordered["first_season"].iloc[1:].to_numpy() > ordered["last_season"].iloc[:-1].to_numpy()
+    ).all():
+        return int(ordered.index[-1])
+    return None
+
+
 def match_bart(r: pd.Series, bart: pd.DataFrame) -> BartMatch:
     lo, hi = _college_window(r)
     cands = bart[(bart["season"] >= lo) & (bart["season"] <= hi)]
@@ -305,6 +326,7 @@ def match_bart(r: pd.Series, bart: pd.DataFrame) -> BartMatch:
         player_name=("player_name", "last"),
         birth_date=("birth_date", "max"),
         nba_pick=("nba_pick", "max"),
+        first_season=("season", "min"),
         last_season=("season", "max"),
         team=("team", "last"),
         last=("last_norm", "last"),
@@ -319,6 +341,8 @@ def match_bart(r: pd.Series, bart: pd.DataFrame) -> BartMatch:
         hit = per[(per["birth_date"] == r["birth_date"]) & plausible]
         if len(hit) == 1:
             return BartMatch(int(hit.index[0]), "birthdate", float(hit.iloc[0].name_score))
+        if (pid := _resolve_transfer(hit)) is not None:
+            return BartMatch(pid, "birthdate_transfer", float(hit["name_score"].min()))
     if r["drafted"]:
         hit = per[(per["nba_pick"] == r["pick_overall"]) & (per["last_season"] == r["draft_year"])
                   & ((per["name_score"] >= NAME_MIN) | same_last)]  # fmt: skip
@@ -327,10 +351,13 @@ def match_bart(r: pd.Series, bart: pd.DataFrame) -> BartMatch:
     per = per[per["name_score"] >= NAME_MIN - 10]
     if per.empty:
         return BartMatch(None, "unresolved", 0.0)
-    per["school_score"] = per["team"].map(lambda t: school_sim(r["colleges"], t))
+    per["school_score"] = per["team"].map(lambda t: best_school_sim(r["colleges"], t))
     hit = per[(per["name_score"] >= NAME_MIN) & (per["school_score"] >= 85)]
     if len(hit) == 1:
         return BartMatch(int(hit.index[0]), "name_school", float(hit.iloc[0].name_score))
+    hit = hit[hit["name_score"] >= FUZZY_MIN]
+    if (pid := _resolve_transfer(hit)) is not None:
+        return BartMatch(pid, "name_school_transfer", float(hit["name_score"].min()))
     hit = per[per["name_score"] >= FUZZY_MIN]
     if len(hit) == 1 and r["drafted"] and pd.notna(r["colleges"]):
         return BartMatch(int(hit.index[0]), "fuzzy_name", float(hit.iloc[0].name_score))

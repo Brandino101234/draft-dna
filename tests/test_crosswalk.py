@@ -182,3 +182,42 @@ def test_bart_nickname_accepted_with_birthdate_and_last_name() -> None:
                   colleges="Kentucky")  # fmt: skip
     m = match_bart(p, bart)
     assert (m.bart_pid, m.method) == (20, "birthdate")
+
+
+def test_bart_transfer_with_two_ids_resolves_to_latest_school() -> None:
+    bart = pd.DataFrame(
+        {
+            "bart_pid": [30, 30, 31, 31],
+            "player_name": ["Caleb Martin"] * 4,
+            "season": [2015, 2016, 2018, 2019],
+            "team": ["N.C. State", "N.C. State", "Nevada", "Nevada"],
+            "birth_date": [pd.Timestamp("1995-09-28")] * 4,
+            "nba_pick": pd.array([pd.NA] * 4, dtype="Int64"),
+        }
+    )
+    bart["last_norm"] = "martin"
+    bart["first_norm"] = "caleb"
+    p = _prospect(player_name="Caleb Martin", player_first="caleb", player_last="martin",
+                  drafted=False, first_season=2020, birth_date=pd.Timestamp("1995-09-28"),
+                  colleges="NC State,Nevada")  # fmt: skip
+    m = match_bart(p, bart)
+    assert (m.bart_pid, m.method) == (31, "birthdate_transfer")
+
+
+def test_twins_at_same_school_are_not_merged() -> None:
+    bart = pd.DataFrame(
+        {
+            "bart_pid": [40, 41],
+            "player_name": ["Travis Wear", "David Wear"],
+            "season": [2014, 2014],
+            "team": ["UCLA", "UCLA"],
+            "birth_date": [pd.Timestamp("1990-09-21")] * 2,
+            "nba_pick": pd.array([pd.NA, pd.NA], dtype="Int64"),
+        }
+    )
+    bart["last_norm"] = "wear"
+    bart["first_norm"] = ["travis", "david"]
+    p = _prospect(player_name="Travis Wear", player_first="travis", player_last="wear",
+                  drafted=False, first_season=2015, birth_date=pd.Timestamp("1990-09-21"),
+                  colleges="UNC,UCLA")  # fmt: skip
+    assert match_bart(p, bart).bart_pid == 40
