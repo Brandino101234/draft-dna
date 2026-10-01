@@ -1,0 +1,74 @@
+"""Orchestrate ingestion per source. Every step is resumable: cached pages are free."""
+
+from __future__ import annotations
+
+import pandas as pd
+
+from draft_dna.config import Settings, get_settings
+from draft_dna.ingest import bbref
+from draft_dna.ingest.fetcher import Fetcher
+from draft_dna.ingest.storage import read_table, table_path, write_table
+from draft_dna.logging_utils import get_logger
+
+log = get_logger(__name__)
+
+
+def nba_seasons(s: Settings) -> list[int]:
+    """NBA seasons (ending year) from the first training class's rookie year to now."""
+    return list(range(s.draft_classes.training[0] + 1, s.current_nba_season + 1))
+
+
+def completed_seasons(s: Settings) -> list[int]:
+    return [y for y in nba_seasons(s) if y < s.current_nba_season]
+
+
+def run_bbref_league(settings: Settings | None = None) -> None:
+    """Drafts, season stats, team ratings, coaches, awards, All-Stars, player index."""
+    s = settings or get_settings()
+    f = Fetcher(bbref.SOURCE, settings=s)
+    cur = s.current_nba_season
+
+    write_table(
+        bbref.ingest_drafts(f, s.draft_classes.all_years(), cur), "raw", "bbref", "draft", s
+    )
+    write_table(bbref.ingest_player_index(f), "raw", "bbref", "player_index", s)
+    write_table(bbref.ingest_league_averages(f, cur), "raw", "bbref", "league_averages", s)
+    for name, df in bbref.ingest_season_player_stats(f, nba_seasons(s), cur).items():
+        write_table(df, "raw", "bbref", f"season_{name}", s)
+    write_table(
+        bbref.ingest_team_seasons(f, nba_seasons(s), cur), "raw", "bbref", "team_seasons", s
+    )
+    write_table(bbref.ingest_coaches(f, nba_seasons(s), cur), "raw", "bbref", "coaches", s)
+    write_table(bbref.ingest_awards(f, completed_seasons(s)), "raw", "bbref", "awards", s)
+    write_table(bbref.ingest_all_stars(f, completed_seasons(s)), "raw", "bbref", "all_stars", s)
+    log.info("bbref league pages done (%d network requests)", f.network_requests)
+
+
+def player_page_ids(s: Settings) -> list[str]:
+    """Everyone drafted in our classes plus everyone who debuted in our NBA seasons.
+
+    The second group contains the undrafted players; bios tell us which is which.
+    """
+    draft = read_table("raw", "bbref", "draft", s)
+    index = read_table("raw", "bbref", "player_index", s)
+    debut_ok = pd.to_numeric(index["year_min"], errors="coerce") >= nba_seasons(s)[0]
+    ids = set(draft["bbref_id"].dropna()) | set(index.loc[debut_ok, "player__id"].dropna())
+    return sorted(ids)
+
+
+def run_bbref_players(settings: Settings | None = None) -> None:
+    s = settings or get_settings()
+    if not table_path("raw", "bbref", "draft", s).exists():
+        raise RuntimeError("run the bbref league step first")
+    f = Fetcher(bbref.SOURCE, settings=s)
+    ids = player_page_ids(s)
+    log.info("player pages: %d players (cached ones are free)", len(ids))
+    for name, df in bbref.ingest_player_pages(f, ids).items():
+        write_table(df, "raw", "bbref", name, s)
+    log.info("bbref player pages done (%d network requests)", f.network_requests)
+
+
+STEPS = {
+    "bbref-league": run_bbref_league,
+    "bbref-players": run_bbref_players,
+}
