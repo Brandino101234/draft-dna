@@ -93,6 +93,13 @@ def nba_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
     star_keys = set(zip(stars["bbref_id"], stars["season"], strict=True))
     out["all_star"] = [k in star_keys for k in zip(out["bbref_id"], out["season"], strict=True)]
 
+    # Era adjustment: efficiency and shot mix relative to that season's league average.
+    # Counting stats are already available per 100 possessions (pace-neutral).
+    era = read_table("modeled", "era", "nba_era", s).set_index("season")
+    out["ts_rel"] = out["ts_pct"] - out["season"].map(era["ts_pct"])
+    out["fg3a_rate_rel"] = out["fg3a_per_fga_pct"] - out["season"].map(era["fg3a_rate"])
+    out["league_pace"] = out["season"].map(era["pace"])
+
     # Season number relative to draft (season 1 = the season after the draft).
     u = universe.set_index("bbref_id")
     base_year = u["draft_year"].where(u["drafted"], u["first_season"] - 1)
@@ -137,6 +144,11 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
     bart_value_cols = [c for c in out.columns if c.startswith("bart_") and c != "bart_pid"]
     out.loc[mismatch, bart_value_cols] = pd.NA
     out["bart_school_mismatch"] = mismatch
+    if table_path("modeled", "era", "ncaa_era", s).exists():
+        era = read_table("modeled", "era", "ncaa_era", s).set_index("season")
+        out["ts_rel"] = out["ts_pct"] - out["season"].map(era["ts_pct"])
+        out["fg3a_rate_rel"] = out["fg3a_per_fga_pct"] - out["season"].map(era["fg3a_rate"])
+        out["ncaa_three_line_ft"] = out["season"].map(era["three_line_ft"])
     bteams = read_table("staging", "barttorvik", "team_seasons", s)
     bt = bteams.rename(
         columns={"team": "bart_team", "sos": "bart_team_sos", "barthag": "bart_team_barthag",
