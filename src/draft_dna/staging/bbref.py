@@ -122,7 +122,8 @@ def stage_awards(s: Settings) -> pd.DataFrame:
     for c in ("all_defense_team", "all_rookie_team"):
         if c in a:
             team_col = team_col.fillna(a[c])
-    a["team_level"] = team_col.replace("", pd.NA)
+    # Since 2022 All-NBA teams are labeled "1T"/"2T"/"3T"; ORV = other receiving votes.
+    a["team_level"] = team_col.replace({"": pd.NA, "1T": "1st", "2T": "2nd", "3T": "3rd"})
     a["vote_rank"] = to_num(a["rank"]).astype("Int64") if "rank" in a else pd.NA
     team_awards = a["award"].isin(["all_nba", "all_defense", "all_rookie"])
     a["selected"] = (team_awards & a["team_level"].isin(["1st", "2nd", "3rd"])) | (

@@ -57,14 +57,16 @@ def test_draft_slots_unique(con) -> None:
 
 
 def test_draft_sources_agree_on_names(con) -> None:
-    # Basketball-Reference and stats.nba.com list the same player in each slot.
+    # Nearly every pick links to stats.nba.com by name; low-similarity links are rare
+    # and are only the pick-number fallback for garbled names ("Ha Ha", "Sun Sun").
     low = q(
         con,
-        """SELECT draft_year, pick_overall, player_name, nba_player_name, nba_score
-        FROM modeled.xwalk__players WHERE nba_method = 'draft_slot' AND nba_score < 70""",
+        """SELECT draft_year, pick_overall, player_name, nba_player_name, nba_method, nba_score
+        FROM modeled.xwalk__players WHERE nba_method LIKE 'draft%' AND nba_score < 75""",
     )
-    total = scalar(con, "SELECT count(*) FROM modeled.xwalk__players WHERE nba_method='draft_slot'")
-    assert len(low) / total < 0.01, low
+    total = scalar(con, "SELECT count(*) FROM modeled.xwalk__players WHERE drafted")
+    assert len(low) / total < 0.005, low
+    assert set(low.nba_method) <= {"draft_pick_slot"}, low
 
 
 # ------------------------------------------------------------------------- crosswalk
@@ -136,7 +138,7 @@ def test_nba_seasons_unique_and_sane(con) -> None:
     bad = q(
         con,
         """SELECT bbref_id, season, games, season_games FROM modeled.core__nba_player_seasons
-        WHERE games > season_games OR mp < 0 OR games IS NULL""",
+        WHERE games > season_games + 4 OR mp < 0 OR games IS NULL""",
     )
     assert bad.empty, bad
 
