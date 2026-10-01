@@ -23,7 +23,7 @@ def normalize_name(name: str | None, *, drop_suffix: bool = True) -> str:
     'Luka Dončić' -> 'luka doncic'; 'Kevin Porter Jr.' -> 'kevin porter';
     "D'Angelo Russell" -> 'dangelo russell'; 'P.J. Tucker' -> 'pj tucker'.
     """
-    if not name:
+    if not isinstance(name, str) or not name:  # None, NaN, pd.NA
         return ""
     s = unidecode(name).lower()
     s = re.sub(r"[.'`\u2019]", "", s)

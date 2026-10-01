@@ -1,7 +1,13 @@
 import pandas as pd
 import pytest
 
-from draft_dna.crosswalk.build import link_nba, match_bart, normalize_school, school_sim
+from draft_dna.crosswalk.build import (
+    link_draft_history,
+    link_undrafted,
+    match_bart,
+    normalize_school,
+    school_sim,
+)
 from draft_dna.crosswalk.names import normalize_name
 
 
@@ -40,40 +46,84 @@ def test_school_names_differ() -> None:
 
 
 def _universe(**overrides: object) -> pd.DataFrame:
-    base = {
-        "bbref_id": "x01",
-        "player_name": "Mike James",
-        "nba_person_id": pd.NA,
-        "nba_player_name": None,
-        "first_season": 2018,
-    }
+    base = {"bbref_id": "x01", "player_name": "Mike James", "first_season": 2018,
+            "birth_date": pd.NaT}  # fmt: skip
     base.update(overrides)
     return pd.DataFrame([base])
 
 
 NBA = pd.DataFrame(
     {
-        "nba_person_id": [1, 2, 3],
-        "player_name": ["Mike James", "Mike James", "Mikal Bridges"],
-        "first_season": [2002, 2018, 2019],
+        "nba_person_id": [1, 2, 3, 4, 5, 6],
+        "player_name": [
+            "Mike James",
+            "Mike James",
+            "Mikal Bridges",
+            "Ike Fontaine",
+            "Tony Mitchell",
+            "Tony Mitchell",
+        ],
+        "first_season": [2002, 2018, 2019, 2011, 2014, 2014],
     }
 )
 
 
 def test_undrafted_link_disambiguates_shared_names_by_debut_season() -> None:
-    out = link_nba(_universe(), NBA).iloc[0]
+    out = link_undrafted(_universe(), NBA).iloc[0]
     assert (out.nba_person_id, out.nba_method) == (2, "name_season")
 
 
-def test_drafted_link_uses_draft_slot_and_scores_name() -> None:
-    u = _universe(nba_person_id=3, nba_player_name="Mikal Bridges", player_name="Mikal Bridges")
-    out = link_nba(u, NBA).iloc[0]
-    assert (out.nba_person_id, out.nba_method, out.nba_score) == (3, "draft_slot", 100.0)
+def test_same_name_same_season_split_by_birthdate() -> None:
+    births = {5: "1989-04-07", 6: "1992-04-07"}
+    u = _universe(
+        player_name="Tony Mitchell", first_season=2014, birth_date=pd.Timestamp("1992-04-07")
+    )
+    out = link_undrafted(u, NBA, birth_lookup=births.get).iloc[0]
+    assert (out.nba_person_id, out.nba_method) == (6, "name_birthdate")
+
+
+def test_nickname_linked_by_unique_last_name_and_initial() -> None:
+    out = link_undrafted(_universe(player_name="Isaac Fontaine", first_season=2011), NBA).iloc[0]
+    assert (out.nba_person_id, out.nba_method) == (4, "lastname_season")
+
+
+def test_last_name_alone_never_links_different_first_initials() -> None:
+    nba = pd.DataFrame(
+        {"nba_person_id": [7], "player_name": ["Davon Reed"], "first_season": [2018]}
+    )
+    out = link_undrafted(_universe(player_name="Willie Reed", first_season=2016), nba).iloc[0]
+    assert out.nba_method == "unresolved"
 
 
 def test_unmatched_name_is_unresolved() -> None:
-    out = link_nba(_universe(player_name="Nobody Here"), NBA).iloc[0]
+    out = link_undrafted(_universe(player_name="Nobody Here"), NBA).iloc[0]
     assert out.nba_method == "unresolved"
+
+
+def test_draft_link_survives_pick_numbering_differences() -> None:
+    # Sources disagree on pick numbers (2001: BBRef #30 Hassell, stats.nba.com #30 Arenas).
+    picks = pd.DataFrame(
+        {
+            "bbref_id": ["hasse01", "arena01", "sweet01"],
+            "player_name": ["Trenton Hassell", "Gilbert Arenas", "Mike Sweetney"],
+            "draft_year": [2001, 2001, 2001],
+            "pick_overall": [30, 31, 9],
+        }
+    )
+    hist = pd.DataFrame(
+        {
+            "draft_year": [2001, 2001, 2001],
+            "pick_overall": [30, 29, 9],
+            "nba_person_id": [10, 11, 12],
+            "nba_player_name": ["Gilbert Arenas", "Trenton Hassell", "Michael Sweetney"],
+            "pre_draft_org": ["Arizona", "Austin Peay", "Georgetown"],
+            "pre_draft_org_type": ["College/University"] * 3,
+        }
+    )
+    out = link_draft_history(picks, hist).set_index("bbref_id")
+    assert out.loc["hasse01", "nba_person_id"] == 11
+    assert out.loc["arena01", "nba_person_id"] == 10
+    assert out.loc["sweet01", ["nba_person_id", "draft_link_method"]].tolist() == [12, "fuzzy_name"]
 
 
 BART = pd.DataFrame(
@@ -119,3 +169,16 @@ def test_bart_uses_nba_pick_when_no_birthdate() -> None:
 def test_bart_same_name_different_school_not_confused() -> None:
     m = match_bart(_prospect(pick_overall=99, colleges="Connecticut"), BART)
     assert (m.bart_pid, m.method) == (10, "name_school")
+
+
+def test_bart_nickname_accepted_with_birthdate_and_last_name() -> None:
+    bart = pd.DataFrame({"bart_pid": [20], "player_name": ["Edrice Adebayo"], "season": [2017],
+                         "team": ["Kentucky"], "birth_date": [pd.Timestamp("1997-07-18")],
+                         "nba_pick": pd.array([14], dtype="Int64")})  # fmt: skip
+    bart["last_norm"] = "adebayo"
+    bart["first_norm"] = "edrice"
+    p = _prospect(player_name="Bam Adebayo", player_first="bam", player_last="adebayo",
+                  draft_year=2017, pick_overall=14, birth_date=pd.Timestamp("1997-07-18"),
+                  colleges="Kentucky")  # fmt: skip
+    m = match_bart(p, bart)
+    assert (m.bart_pid, m.method) == (20, "birthdate")

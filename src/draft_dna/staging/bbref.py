@@ -18,42 +18,12 @@ def _raw(name: str, s: Settings) -> pd.DataFrame:
 
 
 def stage_draft(s: Settings) -> pd.DataFrame:
+    """Basketball-Reference picks. stats.nba.com IDs are attached in the crosswalk by name:
+    the two sources number second-round picks differently in some years (1997, 2001, 2002).
+    """
     d = _raw("draft", s)
     d = d[d["player_name"].notna() & (d["player_name"] != "")].copy()  # forfeited picks
-    nh = read_table("raw", "nba_api", "draft_history", s)
-    nh = nh.assign(draft_year=nh["SEASON"].astype(int), pick_overall=nh["OVERALL_PICK"].astype(int))
-    nh = nh[
-        [
-            "draft_year",
-            "pick_overall",
-            "PERSON_ID",
-            "PLAYER_NAME",
-            "ORGANIZATION",
-            "ORGANIZATION_TYPE",
-        ]
-    ]
-    out = d.merge(nh, on=["draft_year", "pick_overall"], how="left", validate="one_to_one")
-    out = out.rename(
-        columns={
-            "PERSON_ID": "nba_person_id",
-            "PLAYER_NAME": "nba_player_name",
-            "ORGANIZATION": "pre_draft_org",
-            "ORGANIZATION_TYPE": "pre_draft_org_type",
-        }
-    )
-    out["prospect_source"] = (
-        out["pre_draft_org_type"]
-        .map(
-            {
-                "College/University": "college",
-                "High School": "high_school",
-                "Other Team/Club": "other_team",
-            }
-        )
-        .fillna("unknown")
-    )
-    out["nba_person_id"] = out["nba_person_id"].astype("Int64")
-    return out.reset_index(drop=True)
+    return d.reset_index(drop=True)
 
 
 def stage_player_index(s: Settings) -> pd.DataFrame:

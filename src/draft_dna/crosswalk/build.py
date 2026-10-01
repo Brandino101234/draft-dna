@@ -14,6 +14,7 @@ Every link records a method and score. Manual overrides (committed CSV) win.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,7 +22,8 @@ import pandas as pd
 from rapidfuzz import fuzz
 
 from draft_dna.config import Settings
-from draft_dna.crosswalk.names import normalize_name
+from draft_dna.crosswalk.names import last_name, normalize_name
+from draft_dna.ingest import nba_stats
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
 
@@ -67,7 +69,7 @@ SCHOOL_ALIASES = {
 
 
 def normalize_school(name: str | None) -> str:
-    if not name:
+    if not isinstance(name, str) or not name:
         return ""
     s = re.sub(r"\(.*?\)", "", name)
     s = normalize_name(s, drop_suffix=False)
@@ -78,7 +80,7 @@ def normalize_school(name: str | None) -> str:
 
 
 def school_sim(a: str | None, b: str | None) -> float:
-    if not a or not b:
+    if not isinstance(a, str) or not isinstance(b, str) or not a or not b:
         return 0.0
     # token_sort, not token_set: "kansas" must not fully match "kansas state".
     return float(fuzz.token_sort_ratio(normalize_school(a), normalize_school(b)))
@@ -91,8 +93,7 @@ def player_universe(s: Settings) -> pd.DataFrame:
     index = read_table("staging", "bbref", "player_index", s)
     first_season = s.draft_classes.training[0] + 1
     drafted = draft[["bbref_id", "player_name", "draft_year", "round", "pick_overall",
-                     "team_id", "college_name", "nba_person_id", "nba_player_name",
-                     "prospect_source"]].copy()  # fmt: skip
+                     "team_id", "college_name"]].copy()  # fmt: skip
     drafted["drafted"] = True
 
     late = index[
@@ -106,7 +107,6 @@ def player_universe(s: Settings) -> pd.DataFrame:
         # Drafted before our first class (e.g. a 1993 pick debuting in 1997): out of scope.
         early = draft_text.fillna("").str.contains(r"\d{4} NBA Draft")
         undrafted = undrafted[~early]
-        undrafted["prospect_source"] = "unknown"
     out = pd.concat([drafted, undrafted], ignore_index=True)
     index_cols = ["bbref_id", "first_season", "last_season", "birth_date", "height_in",
                   "weight_lb", "pos"]  # fmt: skip
@@ -128,39 +128,143 @@ def player_universe(s: Settings) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------- nba person id
-def link_nba(universe: pd.DataFrame, nba_players: pd.DataFrame) -> pd.DataFrame:
+DRAFT_FUZZY_MIN = 75
+ORG_TYPE_TO_SOURCE = {
+    "College/University": "college",
+    "High School": "high_school",
+    "Other Team/Club": "other_team",
+}
+
+
+def link_draft_history(drafted: pd.DataFrame, history: pd.DataFrame) -> pd.DataFrame:
+    """Match BBRef picks to stats.nba.com draft rows within each draft year.
+
+    Order: exact normalized name; best fuzzy name (greedy, >= DRAFT_FUZZY_MIN); then
+    same pick number for whatever is left on both sides (flagged by a low score).
+    """
+    out = []
+    for year, picks in drafted.groupby("draft_year"):
+        hist = history[history["draft_year"] == year].copy()
+        hist["norm"] = hist["nba_player_name"].map(normalize_name)
+        left = picks.assign(norm=picks["player_name"].map(normalize_name))
+        used: set[int] = set()
+
+        def take(
+            bbref_id: str, h: pd.Series, method: str, score: float, used: set[int] = used
+        ) -> None:
+            used.add(int(h.name))
+            out.append({"bbref_id": bbref_id, **h.drop("norm").to_dict(),
+                        "draft_link_method": method, "draft_link_score": score})  # fmt: skip
+
+        pending = []
+        for r in left.itertuples():
+            hits = hist[(hist["norm"] == r.norm) & ~hist.index.isin(used)]
+            if len(hits) == 1:
+                take(r.bbref_id, hits.iloc[0], "name", 100.0)
+            else:
+                pending.append(r)
+        scored = []
+        for r in pending:
+            for idx, h in hist[~hist.index.isin(used)].iterrows():
+                scored.append((name_sim(r.player_name, h["nba_player_name"]), r.bbref_id, idx))
+        done: set[str] = set()
+        for score, bid, idx in sorted(scored, reverse=True):
+            if score < DRAFT_FUZZY_MIN or bid in done or idx in used:
+                continue
+            take(bid, hist.loc[idx], "fuzzy_name", score)
+            done.add(bid)
+        for r in pending:
+            if r.bbref_id in done:
+                continue
+            slot = hist[(hist["pick_overall"] == r.pick_overall) & ~hist.index.isin(used)]
+            if len(slot) == 1:
+                h = slot.iloc[0]
+                take(r.bbref_id, h, "pick_slot", name_sim(r.player_name, h["nba_player_name"]))
+            else:
+                out.append({"bbref_id": r.bbref_id, "draft_link_method": "unresolved",
+                            "draft_link_score": 0.0})  # fmt: skip
+    res = pd.DataFrame(out).drop(columns=["draft_year", "pick_overall"], errors="ignore")
+    res["nba_person_id"] = res["nba_person_id"].astype("Int64")
+    return res
+
+
+def link_undrafted(
+    universe: pd.DataFrame,
+    nba_players: pd.DataFrame,
+    birth_lookup: Callable[[int], str | None] | None = None,
+) -> pd.DataFrame:
+    """Link undrafted players to stats.nba.com by name and debut season.
+
+    stats.nba.com debut years sometimes differ from BBRef by a season or two (signed
+    but inactive), so windows are +/-2. Same-name candidates are split by birthdate.
+    """
+    nba = nba_players.assign(
+        norm=nba_players["player_name"].map(normalize_name),
+        last=nba_players["player_name"].map(last_name),
+    )
+    uni = universe.assign(last=universe["player_name"].map(last_name))
     rows = []
-    nba = nba_players.assign(norm=nba_players["player_name"].map(normalize_name))
-    by_norm = nba.groupby("norm")
-    for r in universe.itertuples():
-        if pd.notna(r.nba_person_id):
-            score = name_sim(r.player_name, r.nba_player_name or "")
-            rows.append((r.bbref_id, int(r.nba_person_id), "draft_slot", score))
-            continue
+    for r in uni.itertuples():
         if pd.isna(r.first_season):
             rows.append((r.bbref_id, pd.NA, "unresolved", 0.0))
             continue
         norm = normalize_name(r.player_name)
-        cands = by_norm.get_group(norm) if norm in by_norm.groups else nba.iloc[0:0]
-        cands = cands[(cands["first_season"] - r.first_season).abs() <= 1]
-        if len(cands) == 1:
-            rows.append((r.bbref_id, int(cands.iloc[0].nba_person_id), "name_season", 100.0))
+        near = nba[(nba["first_season"] - r.first_season).abs() <= 2]
+        # Exact names get a wider window (signed-but-inactive years shift debut dates).
+        same = nba[(nba["norm"] == norm) & ((nba["first_season"] - r.first_season).abs() <= 3)]
+        exact = same[same["first_season"] == r.first_season]
+        if len(exact) == 1:
+            rows.append((r.bbref_id, int(exact.iloc[0].nba_person_id), "name_season", 100.0))
             continue
-        window = nba[(nba["first_season"] - r.first_season).abs() <= 1]
-        sims = window["player_name"].map(lambda n, name=r.player_name: name_sim(name, n))
-        best = sims.max() if len(sims) else 0
+        if len(same) == 1:
+            rows.append((r.bbref_id, int(same.iloc[0].nba_person_id), "name_season", 100.0))
+            continue
+        if len(same) > 1 and birth_lookup is not None and pd.notna(r.birth_date):
+            bd = pd.Timestamp(r.birth_date).strftime("%Y-%m-%d")
+            hit = [int(c) for c in same["nba_person_id"] if birth_lookup(int(c)) == bd]
+            if len(hit) == 1:
+                rows.append((r.bbref_id, hit[0], "name_birthdate", 100.0))
+                continue
+        # Unique last name on both sides within the window (nicknames: Pooh/Eugene).
+        # Require the same first initial (Isaac/Ike, Stanislav/Slava) so that
+        # "Willie Reed" cannot fall onto "Davon Reed"; true nicknames go in overrides.
+        initial = norm[:1]
+        nba_last = near[(near["last"] == r.last) & (near["norm"].str[:1] == initial)]
+        uni_last = uni[
+            (uni["last"] == r.last) & ((uni["first_season"] - r.first_season).abs() <= 2)
+        ]
+        if len(nba_last) == 1 and len(uni_last) == 1:
+            score = float(fuzz.token_set_ratio(norm, nba_last.iloc[0].norm))
+            rows.append((r.bbref_id, int(nba_last.iloc[0].nba_person_id), "lastname_season", score))
+            continue
+        sims = near["player_name"].map(lambda n, name=r.player_name: name_sim(name, n))
+        best = float(sims.max()) if len(sims) else 0.0
         if best >= FUZZY_MIN and (sims == best).sum() == 1:
             rows.append(
-                (
-                    r.bbref_id,
-                    int(window.loc[sims.idxmax()].nba_person_id),
-                    "fuzzy_season",
-                    float(best),
-                )
+                (r.bbref_id, int(near.loc[sims.idxmax()].nba_person_id), "fuzzy_season", best)
             )
         else:
-            rows.append((r.bbref_id, pd.NA, "unresolved", float(best)))
+            rows.append((r.bbref_id, pd.NA, "unresolved", best))
     return pd.DataFrame(rows, columns=["bbref_id", "nba_person_id", "nba_method", "nba_score"])
+
+
+def link_nba(
+    universe: pd.DataFrame,
+    history: pd.DataFrame,
+    nba_players: pd.DataFrame,
+    birth_lookup: Callable[[int], str | None] | None = None,
+) -> pd.DataFrame:
+    drafted = universe[universe["drafted"]]
+    d = link_draft_history(drafted, history)
+    d["nba_method"] = "draft_" + d["draft_link_method"]
+    d["nba_score"] = d["draft_link_score"]
+    d.loc[d["draft_link_method"] == "unresolved", "nba_method"] = "unresolved"
+    u = link_undrafted(universe[~universe["drafted"]], nba_players, birth_lookup)
+    out = pd.concat(
+        [d.drop(columns=["draft_link_method", "draft_link_score"]), u], ignore_index=True
+    )
+    out["prospect_source"] = out["pre_draft_org_type"].map(ORG_TYPE_TO_SOURCE).fillna("unknown")
+    return out
 
 
 # ------------------------------------------------------------------------ barttorvik
@@ -200,21 +304,26 @@ def match_bart(r: pd.Series, bart: pd.DataFrame) -> BartMatch:
         nba_pick=("nba_pick", "max"),
         last_season=("season", "max"),
         team=("team", "last"),
+        last=("last_norm", "last"),
     )
     per["name_score"] = per["player_name"].map(lambda n: name_sim(r["player_name"], n))
-    per = per[per["name_score"] >= NAME_MIN - 10]
-    if per.empty:
-        return BartMatch(None, "unresolved", 0.0)
+    # Nicknames ("Bam" Adebayo is "Edrice" on Barttorvik) fail name similarity, so a
+    # hard identifier (birthdate, NBA pick) plus an exact last name is also accepted.
+    same_last = per["last"] == last
+    plausible = (per["name_score"] >= NAME_MIN - 10) | same_last
 
     if pd.notna(r["birth_date"]):
-        hit = per[(per["birth_date"] == r["birth_date"]) & (per["name_score"] >= NAME_MIN - 10)]
+        hit = per[(per["birth_date"] == r["birth_date"]) & plausible]
         if len(hit) == 1:
             return BartMatch(int(hit.index[0]), "birthdate", float(hit.iloc[0].name_score))
     if r["drafted"]:
         hit = per[(per["nba_pick"] == r["pick_overall"]) & (per["last_season"] == r["draft_year"])
-                  & (per["name_score"] >= NAME_MIN)]  # fmt: skip
+                  & ((per["name_score"] >= NAME_MIN) | same_last)]  # fmt: skip
         if len(hit) == 1:
             return BartMatch(int(hit.index[0]), "nba_pick", float(hit.iloc[0].name_score))
+    per = per[per["name_score"] >= NAME_MIN - 10]
+    if per.empty:
+        return BartMatch(None, "unresolved", 0.0)
     per["school_score"] = per["team"].map(lambda t: school_sim(r["colleges"], t))
     hit = per[(per["name_score"] >= NAME_MIN) & (per["school_score"] >= 85)]
     if len(hit) == 1:
@@ -295,15 +404,21 @@ def apply_overrides(xw: pd.DataFrame, path: Path = OVERRIDES) -> pd.DataFrame:
             "nba_person_id": "nba_method",
             "bart_pid": "bart_method",
             "cbb_id": "cbb_method",
-        }[o.field]
-        xw.loc[mask, method_col] = "manual"
+        }.get(o.field)
+        if method_col:
+            xw.loc[mask, method_col] = "manual"
     return xw
 
 
 def build_crosswalk(s: Settings) -> tuple[pd.DataFrame, pd.DataFrame]:
     universe = player_universe(s)
-    nba = link_nba(universe, read_table("staging", "nba_api", "players", s))
-    universe = universe.drop(columns=["nba_person_id"]).merge(nba, on="bbref_id", how="left")
+    nba = link_nba(
+        universe,
+        read_table("staging", "nba_api", "draft_history", s),
+        read_table("staging", "nba_api", "players", s),
+        birth_lookup=lambda pid: nba_stats.player_birth_date(pid, s),
+    )
+    universe = universe.merge(nba, on="bbref_id", how="left")
     bart = read_table("staging", "barttorvik", "player_seasons", s)
     universe = universe.merge(
         link_bart(universe, bart, int(bart["season"].min())), on="bbref_id", how="left"

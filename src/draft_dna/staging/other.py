@@ -37,6 +37,23 @@ def stage_combine(s: Settings) -> pd.DataFrame:
     return out.drop_duplicates(["nba_person_id", "combine_year", "player_name"])
 
 
+def stage_nba_draft_history(s: Settings) -> pd.DataFrame:
+    nh = read_table("raw", "nba_api", "draft_history", s)
+    out = pd.DataFrame(
+        {
+            "draft_year": nh["SEASON"].astype(int),
+            "pick_overall": nh["OVERALL_PICK"].astype(int),
+            "nba_person_id": nh["PERSON_ID"].astype("Int64"),
+            "nba_player_name": nh["PLAYER_NAME"],
+            "pre_draft_org": nh["ORGANIZATION"].replace("", pd.NA),
+            "pre_draft_org_type": nh["ORGANIZATION_TYPE"].replace("", pd.NA),
+        }
+    )
+    years = s.draft_classes.all_years()
+    # Old territorial picks are numbered 0.
+    return out[out["draft_year"].isin(years) & (out["pick_overall"] > 0)].reset_index(drop=True)
+
+
 def stage_nba_players(s: Settings) -> pd.DataFrame:
     p = read_table("raw", "nba_api", "all_players", s)
     return pd.DataFrame(
@@ -139,6 +156,7 @@ def stage_cbb_team_seasons(s: Settings) -> pd.DataFrame:
 def run(s: Settings) -> None:
     write_table(stage_combine(s), "staging", "nba_api", "combine", s)
     write_table(stage_nba_players(s), "staging", "nba_api", "players", s)
+    write_table(stage_nba_draft_history(s), "staging", "nba_api", "draft_history", s)
     write_table(stage_barttorvik_players(s), "staging", "barttorvik", "player_seasons", s)
     write_table(stage_barttorvik_teams(s), "staging", "barttorvik", "team_seasons", s)
     if table_path("raw", "cbb", "player_totals", s).exists():

@@ -8,7 +8,12 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
-from nba_api.stats.endpoints import commonallplayers, draftcombinestats, drafthistory
+from nba_api.stats.endpoints import (
+    commonallplayers,
+    commonplayerinfo,
+    draftcombinestats,
+    drafthistory,
+)
 
 from draft_dna.config import Settings
 from draft_dna.ingest.fetcher import cached_json
@@ -56,3 +61,17 @@ def all_players(settings: Settings | None = None) -> pd.DataFrame:
         settings=settings,
     )
     return result_frame(payload)
+
+
+def player_birth_date(person_id: int, settings: Settings | None = None) -> str | None:
+    """Birthdate (YYYY-MM-DD) from CommonPlayerInfo; used to split same-name players."""
+    payload = cached_json(
+        SOURCE,
+        f"commonplayerinfo/{person_id}",
+        lambda: commonplayerinfo.CommonPlayerInfo(player_id=person_id, timeout=TIMEOUT).get_dict(),
+        settings=settings,
+    )
+    info = result_frame(payload)
+    if info.empty or not info.loc[0, "BIRTHDATE"]:
+        return None
+    return str(info.loc[0, "BIRTHDATE"])[:10]

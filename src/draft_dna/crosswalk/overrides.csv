@@ -1,3 +1,9 @@
 # Manual crosswalk overrides. Applied after automatic matching; method becomes "manual".
 # field: nba_person_id | bart_pid | cbb_id. Empty value clears a wrong automatic link.
 bbref_id,field,value,note
+murraro01,nba_person_id,2436,"Ronald 'Flip' Murray; nickname on stats.nba.com 2002 draft row"
+murraro01,prospect_source,college,Shaw University (Division II)
+jonesma03,nba_person_id,2891,"stats.nba.com merges first season with a 1984 Mark Jones; ID 2891 ends 2005, matching BBRef"
+cuiyo01,nba_person_id,1642385,"stats.nba.com lists him as 'Cui Cui'"
+jetereu01,nba_person_id,200817,"Eugene 'Pooh' Jeter; nickname"
+hernade01,bart_pid,46264,"Dewan Hernandez played at Miami as Dewan Huell (name change); Barttorvik NBA pick 59 matches his 2019 pick"
