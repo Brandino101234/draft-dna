@@ -1,0 +1,3 @@
+# Manual crosswalk overrides. Applied after automatic matching; method becomes "manual".
+# field: nba_person_id | bart_pid | cbb_id. Empty value clears a wrong automatic link.
+bbref_id,field,value,note

@@ -30,7 +30,6 @@ dev = [
     "mypy>=1.11",
     "types-PyYAML",
     "types-requests",
-    "pandas-stubs",
     "types-beautifulsoup4>=4.12.0.20250516",
 ]
 
@@ -62,5 +61,5 @@ markers = [
 addopts = "-m 'not dq'"
 
 [[tool.mypy.overrides]]
-module = ["nba_api.*", "cbbpy.*", "lifelines.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
+module = ["pandas.*", "nba_api.*", "cbbpy.*", "lifelines.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
 ignore_missing_imports = true

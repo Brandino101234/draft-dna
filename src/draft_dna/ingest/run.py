@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from draft_dna.config import Settings, get_settings
-from draft_dna.ingest import barttorvik, bbref, nba_stats
+from draft_dna.ingest import barttorvik, bbref, cbb, nba_stats
 from draft_dna.ingest.fetcher import Fetcher
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
@@ -84,9 +84,34 @@ def run_nba_api(settings: Settings | None = None) -> None:
     write_table(nba_stats.all_players(s), "raw", "nba_api", "all_players", s)
 
 
+def college_seasons(s: Settings) -> list[int]:
+    """College seasons (ending year) that can precede our draft classes: up to 4 years."""
+    years = s.draft_classes.all_years()
+    return list(range(years[0] - 3, years[-1] + 1))
+
+
+def run_cbb_seasons(settings: Settings | None = None) -> None:
+    s = settings or get_settings()
+    f = Fetcher(cbb.SOURCE, settings=s)
+    for name, df in cbb.ingest_team_seasons(f, college_seasons(s)).items():
+        write_table(df, "raw", "cbb", name, s)
+
+
+def run_cbb_players(settings: Settings | None = None) -> None:
+    s = settings or get_settings()
+    if not table_path("raw", "bbref", "player_bios", s).exists():
+        raise RuntimeError("run the bbref-players step first (it provides college links)")
+    bios = read_table("raw", "bbref", "player_bios", s)
+    f = Fetcher(cbb.SOURCE, settings=s)
+    for name, df in cbb.ingest_players(f, bios["cbb_id"].dropna()).items():
+        write_table(df, "raw", "cbb", name, s)
+
+
 STEPS = {
     "bbref-league": run_bbref_league,
     "bbref-players": run_bbref_players,
+    "cbb-seasons": run_cbb_seasons,
+    "cbb-players": run_cbb_players,
     "barttorvik": run_barttorvik,
     "nba-api": run_nba_api,
 }
