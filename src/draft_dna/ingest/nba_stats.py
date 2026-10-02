@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 from nba_api.stats.endpoints import (
     commonallplayers,
+    shotchartdetail,
     commonplayerinfo,
     draftcombinestats,
     drafthistory,
@@ -75,3 +76,26 @@ def player_birth_date(person_id: int, settings: Settings | None = None) -> str |
     if info.empty or not info.loc[0, "BIRTHDATE"]:
         return None
     return str(info.loc[0, "BIRTHDATE"])[:10]
+
+
+def season_label(season: int) -> str:
+    """2020 -> '2019-20' (season ending year to stats.nba.com format)."""
+    return f"{season - 1}-{season % 100:02d}"
+
+
+def shot_chart(person_id: int, season: int, settings: Settings | None = None) -> pd.DataFrame:
+    """Every regular-season field-goal attempt for one player-season, with zone and x/y."""
+    payload = cached_json(
+        SOURCE,
+        f"shotchartdetail/{person_id}/{season}",
+        lambda: shotchartdetail.ShotChartDetail(
+            team_id=0,
+            player_id=person_id,
+            season_nullable=season_label(season),
+            season_type_all_star="Regular Season",
+            context_measure_simple="FGA",
+            timeout=TIMEOUT,
+        ).get_dict(),
+        settings=settings,
+    )
+    return result_frame(payload)

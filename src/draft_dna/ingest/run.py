@@ -151,6 +151,28 @@ def run_espn_shots(settings: Settings | None = None) -> None:
         )
 
 
+NBA_SHOT_SEASONS = 4  # early-career seasons used for "plays like" style comps
+
+
+def run_nba_shots(settings: Settings | None = None) -> None:
+    """stats.nba.com shot charts for each player's first NBA seasons (1996-97 onward)."""
+    s = settings or get_settings()
+    xw = read_table("modeled", "xwalk", "players", s).dropna(subset=["nba_person_id"])
+    seasons = read_table("modeled", "core", "nba_player_seasons", s)
+    seasons = seasons[seasons["bbref_id"].isin(xw["bbref_id"]) & (seasons["mp"] > 0)]
+    seasons = seasons[seasons["season"] < s.current_nba_season]
+    early = seasons.sort_values("season").groupby("bbref_id").head(NBA_SHOT_SEASONS)
+    pid = xw.set_index("bbref_id")["nba_person_id"].astype(int)
+    frames = []
+    for i, r in enumerate(early.itertuples(), 1):
+        df = nba_stats.shot_chart(int(pid[r.bbref_id]), int(r.season), s)
+        if not df.empty:
+            frames.append(df.assign(bbref_id=r.bbref_id, season=int(r.season)))
+        if i % 500 == 0:
+            log.info("nba shots: %d/%d player-seasons", i, len(early))
+    write_table(pd.concat(frames, ignore_index=True), "raw", "nba_api", "shots_early_career", s)
+
+
 STEPS = {
     "bbref-league": run_bbref_league,
     "bbref-players": run_bbref_players,
@@ -159,4 +181,5 @@ STEPS = {
     "barttorvik": run_barttorvik,
     "nba-api": run_nba_api,
     "espn-shots": run_espn_shots,
+    "nba-shots": run_nba_shots,
 }
