@@ -113,7 +113,11 @@ def season_grid(players: pd.DataFrame, seasons: pd.DataFrame, last_season: int) 
         "all_nba_team", "all_defense_team", "won_dpoy",
         "mvp_share", "season_num",
     ]  # fmt: skip
-    s = seasons[["bbref_id", "season", *[c for c in value_cols if c != "season_num"]]]
+    s = seasons.copy()
+    for col in ("all_defense_team", "won_dpoy"):  # optional award columns
+        if col not in s:
+            s[col] = pd.NA
+    s = s[["bbref_id", "season", *[c for c in value_cols if c != "season_num"]]]
     grid = rows.merge(s, on=["bbref_id", "season"], how="left")
     grid["in_nba"] = grid["mp"].notna()
     counts = ["mp", "games", "games_started", "vorp", "ws", "po_vorp", "po_ws", "po_mp"]
