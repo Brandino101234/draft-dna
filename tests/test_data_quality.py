@@ -301,3 +301,45 @@ def test_comps_come_from_earlier_classes_with_known_outcomes(con) -> None:
     assert bad.empty, bad
     per = q(con, "SELECT bbref_id, count(*) n FROM modeled.projections__comps GROUP BY 1")
     assert (per["n"] == 15).all()
+
+
+# -------------------------------------------------------------------- shot DNA
+def test_espn_links_unique_and_pre_draft_shots_only(con) -> None:
+    assert (
+        scalar(
+            con,
+            """SELECT count(*) FROM (SELECT season, athlete_id FROM modeled.shots__espn_player_map
+            GROUP BY 1, 2 HAVING count(*) > 1)""",
+        )
+        == 0
+    )
+    bad = q(
+        con,
+        """SELECT s.bbref_id, s.season, p.draft_year FROM modeled.shots__college_shots s
+        JOIN modeled.core__players p USING (bbref_id) WHERE s.season > p.draft_year""",
+    )
+    assert bad.empty, bad
+
+
+def test_shot_mix_and_zone_shares_sum_to_one(con) -> None:
+    mix = q(con, "SELECT rim_rate + mid_rate + three_rate AS t FROM modeled.features__shot_dna")
+    assert np.allclose(mix["t"].dropna(), 1.0)
+    zones = q(con, "SELECT * FROM modeled.features__shot_zones")
+    assert np.allclose(zones.filter(like="zone_").sum(axis=1), 1.0)
+
+
+def test_eb_shrunk_rates_are_valid_probabilities(con) -> None:
+    eb = q(con, "SELECT rim_fg_eb, mid_fg_eb, three_fg_eb FROM modeled.features__shot_dna")
+    assert ((eb.dropna() > 0) & (eb.dropna() < 1)).all().all()
+
+
+def test_spatial_eligibility_rule(con) -> None:
+    bad = q(
+        con,
+        """SELECT * FROM modeled.features__shot_coverage WHERE xy_eligible
+        AND (xy_fga < 100 OR xy_coverage < 0.4)""",
+    )
+    assert bad.empty, bad
+    maps = scalar(con, "SELECT count(*) FROM modeled.features__shot_maps")
+    elig = scalar(con, "SELECT count(*) FROM modeled.features__shot_coverage WHERE xy_eligible")
+    assert maps == elig

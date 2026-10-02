@@ -199,8 +199,24 @@ def cached_json(
     entry = fetcher.entry(key, None, ext="json")
     if entry.exists():
         return json.loads(entry.body_path.read_text())
-    fetcher._wait_turn()
-    fetcher.network_requests += 1
-    result = call()
-    fetcher._write(entry, key, None, 200, json.dumps(result).encode())
-    return result
+    http = fetcher.settings.http
+    for attempt in range(http.max_retries + 1):
+        fetcher._wait_turn()
+        fetcher.network_requests += 1
+        try:
+            result = call()
+        except Exception as exc:  # throttling shows up as timeouts or non-JSON bodies
+            wait = http.backoff_seconds * 2**attempt
+            log.warning(
+                "%s %s: %s (attempt %d), waiting %.0fs",
+                source,
+                key,
+                type(exc).__name__,
+                attempt + 1,
+                wait,
+            )
+            sleep(wait)
+            continue
+        fetcher._write(entry, key, None, 200, json.dumps(result).encode())
+        return result
+    raise FetchError(f"{source} {key}: gave up after {http.max_retries + 1} attempts")

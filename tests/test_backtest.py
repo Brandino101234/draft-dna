@@ -131,3 +131,24 @@ def test_stats_knn_does_not_pick_hub_players_with_missing_data() -> None:
     # Without the overlap guard, "hub" (only feature d, identical) would rank first.
     assert train.iloc[idx[0][0]]["bbref_id"] == "full_near"
     assert "hub" not in set(train.iloc[idx[0]]["bbref_id"])
+
+
+def test_guardrail_blocks_comps_of_different_size_or_position() -> None:
+    from draft_dna.models.knn import GuardedKnn
+
+    feats = ["rim_rate"]
+    train = pd.DataFrame(
+        {
+            "bbref_id": ["big", "guard_far", "guard_near"],
+            "rim_rate": [0.60, 0.20, 0.55],
+            "height_in": [83.0, 74.0, 75.0],
+            "position": ["big", "guard", "guard"],
+        }
+    )
+    test = pd.DataFrame(
+        {"bbref_id": ["g"], "rim_rate": [0.60], "height_in": [74.5], "position": ["guard"]}
+    )
+    m = GuardedKnn(k=2, features=feats).fit(train, np.zeros(3))
+    idx, _ = m.neighbors(test)
+    # Identical shot profile, but the 6'11" big is not an eligible comp for a 6'2" guard.
+    assert list(train.iloc[idx[0]]["bbref_id"]) == ["guard_near", "guard_far"]

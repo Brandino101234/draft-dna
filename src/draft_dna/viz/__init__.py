@@ -1,1 +1,1 @@
-"""viz layer."""
+"""Plotting helpers."""

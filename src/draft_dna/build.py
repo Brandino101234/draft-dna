@@ -5,8 +5,9 @@ from __future__ import annotations
 from draft_dna import db
 from draft_dna.config import Settings, get_settings
 from draft_dna.crosswalk import build as crosswalk
-from draft_dna.features import era, predraft
+from draft_dna.features import era, predraft, shot_build, shot_dna
 from draft_dna.ingest.run import STEPS
+from draft_dna.ingest.storage import table_path
 from draft_dna.logging_utils import get_logger
 from draft_dna.modeled import integrate
 from draft_dna.outcomes import run as outcomes
@@ -30,6 +31,9 @@ def transform(s: Settings | None = None) -> None:
     log.info("== outcomes")
     outcomes.run(s)
     predraft.run(s)
+    if table_path("raw", "espn", "team_seasons", s).exists():
+        shot_build.run(s)  # ESPN player map first: assisted-shot features depend on it
+    shot_dna.run(s)
     log.info("== duckdb")
     db.load(s)
 

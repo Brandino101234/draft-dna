@@ -161,3 +161,32 @@ Comps are context, not the forecast. Stats-only comps are a poor guide to outcom
 ![2026 bands](reports/phase3/draft_2026_bands.png)
 
 Full tables are in [reports/phase3/phase3_results.md](reports/phase3/phase3_results.md).
+
+## Phase 4: Shot DNA, how each prospect scores
+
+**Audit first.** Before building anything, I sampled 3,148 college games (2008–2026) to see what shot data really exists.
+
+![Shot data coverage](reports/phase4/shot_coverage_by_season.png)
+
+- **Shot type is complete:** every field-goal attempt in ESPN play-by-play is labeled layup, dunk, tip, jumper or three, from 2008 on.
+- **Shot location (x/y) is not.** It doesn't exist before 2014. From 2014–2025 only 11–67% of shots have it, mostly from televised high-major games (48% of televised games vs 9% of others). Coverage fell to 11% in 2024, then jumped to 100% in 2025–26.
+
+That shaped a two-tier design:
+
+| Tier | What it measures | Coverage | Used for |
+|---|---|---|---|
+| A: shot type | rim / midrange / three / dunk mix; shooting by zone (empirical Bayes); assisted vs. self-created makes | 90–100% of drafted college players, 2010+ | Phase 5 headline test |
+| B: shot location | 5 court zones; smoothed shot maps; NMF shot styles | 395 players (53–92% of the 2014–2020 classes, 92% of 2026) | player cards, secondary test |
+
+![Shot data by class](reports/phase4/shot_data_by_draft_class.png)
+
+### Six shot styles
+Each eligible player's shots become a smoothed heat map. Non-negative matrix factorization then finds six building-block "styles," so every player is a mix of them. Shot distances are rescaled so the 3-point line sits in the same place in every era; otherwise the 2019–20 line change creates a fake "old-line threes" style.
+
+![Shot styles](reports/phase4/shot_styles.png)
+
+![Example shot maps](reports/phase4/example_shot_maps.png)
+
+A style mix is a *shape* description, not a shot count. Trae Young's diffuse deep threes carry less weight than his concentrated rim attempts. For "% of shots from X," use the shot-type numbers: Trae took 53% of his shots from three, and only 11% of his rim makes were assisted (versus 49% for Zion).
+
+The test of whether any of this predicts NBA success beyond draft position is Phase 5.
