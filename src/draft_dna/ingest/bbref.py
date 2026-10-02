@@ -217,6 +217,12 @@ def ingest_league_averages(fetcher: Fetcher, current_season: int) -> pd.DataFram
     return df[df["season"].str.len() > 0]
 
 
+def ingest_salary_cap(fetcher: Fetcher) -> pd.DataFrame:
+    """League salary cap by season (used to express salaries as % of cap)."""
+    html = fetcher.get(f"{BASE}/contracts/salary-cap-history.html", max_age=IN_SEASON_MAX_AGE)
+    return parse_table(html, "salary_cap_history")
+
+
 # --------------------------------------------------------------------------- players
 def ingest_player_index(fetcher: Fetcher) -> pd.DataFrame:
     """Every NBA/ABA player: years active, position, size, birth date, colleges."""

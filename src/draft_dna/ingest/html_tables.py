@@ -51,7 +51,7 @@ def parse_table(html: bytes | str, table_id: str, *, body_only: bool = True) -> 
         return pd.DataFrame()
     container = table.find("tbody") if body_only else table
     if not isinstance(container, Tag):
-        return pd.DataFrame()
+        container = table  # some tables have no <tbody>; header rows are skipped below
     rows: list[dict[str, Any]] = []
     for tr in container.find_all("tr"):
         classes = tr.get("class") or []

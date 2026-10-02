@@ -156,6 +156,18 @@ def stage_player_salaries(s: Settings) -> pd.DataFrame:
     return sal[["bbref_id", "season", "team", "salary"]].dropna(subset=["salary"])
 
 
+def stage_salary_cap(s: Settings) -> pd.DataFrame:
+    cap = _raw("salary_cap", s)
+    cap = cap[cap["year_id"].str.match(r"\d{4}-\d{2}", na=False)]
+    out = pd.DataFrame(
+        {
+            "season": (to_num(cap["year_id"].str.slice(0, 4)) + 1).astype("Int64"),
+            "salary_cap": to_num(cap["cap"]),
+        }
+    )
+    return out.dropna().reset_index(drop=True)
+
+
 def run(s: Settings) -> None:
     write_table(stage_draft(s), "staging", "bbref", "draft_picks", s)
     write_table(stage_player_index(s), "staging", "bbref", "player_index", s)
@@ -167,6 +179,8 @@ def run(s: Settings) -> None:
     write_table(stage_awards(s), "staging", "bbref", "nba_awards", s)
     write_table(stage_all_stars(s), "staging", "bbref", "nba_all_stars", s)
     write_table(stage_league_averages(s), "staging", "bbref", "nba_league_averages", s)
+    if table_path("raw", "bbref", "salary_cap", s).exists():
+        write_table(stage_salary_cap(s), "staging", "bbref", "salary_cap", s)
     if table_path("raw", "bbref", "player_bios", s).exists():
         write_table(stage_player_bios(s), "staging", "bbref", "player_bios", s)
         write_table(stage_player_salaries(s), "staging", "bbref", "player_salaries", s)
