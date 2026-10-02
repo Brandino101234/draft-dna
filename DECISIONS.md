@@ -199,3 +199,44 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Test 1:** Spearman ρ between `rim_fg_eb_rel` and the residual of a LightGBM pick + stats model trained only on classes ≤ 2022.
 - **Test 2:** CRPS of LightGBM pick + stats + `rim_fg_eb_rel` vs pick + stats.
 - **Confirmation requires:** ρ > 0 with a 95% CI excluding zero *and* a CRPS improvement whose 95% CI excludes zero. Otherwise the signal is treated as noise.
+
+### D030: Phase 6 methods and findings (who beats their projection, and why)
+**Measure.** For every drafted player with an as-of-draft projection (model of record, D021), the PIT score is where his actual peak landed inside his projected range at years 4, 6 and 8. Point masses at zero use the midpoint. Overall mean PIT is 0.49–0.51 at every horizon (calibrated), so group differences are meaningful. "Below floor" rates sit below 25% because many floors are exactly 0, which cannot be undershot.
+
+**Segments (year 6, mean PIT, 95% CI):**
+- International / pro-team picks **fall short of their slot**: 0.40 (0.37–0.44), n = 218. Partly stash risk: second-round internationals who never come over are zeros.
+- Late first-rounders (picks 15–30) slightly beat their slot: 0.54 (0.51–0.58).
+- Forwards: 0.54 (0.51–0.56).
+- The youngest draftees (< 19.5) sit lower (0.46) than 19.5–20.5-year-olds (0.55).
+- No trend by era.
+- These are descriptive comparisons across ~17 groups; single intervals near 0.5 should not be over-read.
+
+**Drafting franchise: no detectable effect.** Cochran's Q heterogeneity test: p = 0.82 / 0.92 / 0.96 at years 4 / 6 / 8. The estimated between-team variance is 0, so partial pooling returns every team to the league mean. The raw "best" teams (Houston 0.62, Indiana 0.59, ~30 picks each) are within what luck produces.
+
+**Situation effects** (inverse-propensity weighting on pick, age, size, key stats, background, position and draft year; propensities trimmed to 0.05–0.95; 300 bootstrap resamples; E-values on the risk ratio of beating the projected median):
+- **Known before the draft:**
+  - bottom-third team: −0.008 (−0.046, +0.028)
+  - deep at his position: −0.013 (−0.051, +0.022)
+  - No detectable effect from either. Balance after weighting: max |SMD| 0.05 and 0.16; the depth comparison is not fully balanced.
+- **After the draft:**
+  - head-coach change in years 1–3: +0.012 (−0.031, +0.045), no effect
+  - traded in years 1–3: −0.059 (−0.098, −0.022), E-value 1.49
+  - missed ≥ 25% of games in years 1–2: −0.254 (−0.287, −0.209), E-value 3.19
+  - The last two are **associations, not effects**: underperformance plausibly *causes* trades and lost minutes (reverse causality). The low E-value for trades means even weak confounding could explain it. There is no reliable public injury history, so "missed games" mixes injury, G League assignment and DNPs (D005).
+
+**SHAP / overperformance predictability:**
+- **Leave-classes-out CV:** a LightGBM model of PIT from pre-draft traits reaches Spearman 0.26 (year 4).
+- **Strict rolling-origin check** (each class predicted only from classes with known outcomes):
+  - year 4: 0.19 (p < 0.001; college-only 0.15, p < 0.001)
+  - year 6: 0.12 (p = 0.004; college-only 0.04, p = 0.43)
+- **Conclusion:** pre-draft traits predict who outperforms their slot *early* (through year 4), but for college players the edge fades by year 6. That is consistent with Phases 3 and 5 (year-6 target).
+- **SHAP drivers (year 4):** height, assists, rebounds, career FT% and efficiency push toward beating the slot; high usage and turnovers push toward falling short. One reading: teams overvalue scoring volume relative to passing, size and shooting touch, but only for the first few years.
+
+**Verdict reversals:** of 840 players with both a Year-4 Verdict and a Career Grade (years 4 and 8, each vs. the same-point projected range), 14.2% (12.0–16.7%) changed category:
+- **Upgrades: 89 (3× more common than downgrades)**
+  - 61 went from below floor to within band (late-developing role players)
+  - 28 went from within band to beat ceiling (Curry, Shai Gilgeous-Alexander, Harden, Sabonis, Derrick White, Lowry)
+- **Downgrades: 30**
+  - 23 are early overachievers who plateaued (beat ceiling at 4, within band at 8: Anthony Davis, Paul George, Deron Williams, Trae Young). They didn't decline; the projected ceiling for top picks rises through year 8.
+  - Only 7 (0.8%) are true late busts (within band at 4, below floor at 8).
+- **Implication for the grading system (Phase 7):** a year-4 verdict is right ~86% of the time, and when it is wrong it is usually too pessimistic.

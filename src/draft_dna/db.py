@@ -6,6 +6,7 @@ The .duckdb file is disposable; rebuild it with `draft-dna build`.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import duckdb
@@ -22,8 +23,13 @@ def connect(settings: Settings | None = None, read_only: bool = False) -> duckdb
     return duckdb.connect(str(s.paths.database), read_only=read_only)
 
 
+def table_name(path: Path) -> str:
+    """`<area>__<file stem>`, with anything that isn't a letter, digit or _ replaced."""
+    return re.sub(r"[^A-Za-z0-9_]", "_", f"{path.parent.name}__{path.stem}")
+
+
 def _tables(layer_dir: Path) -> list[tuple[str, Path]]:
-    return [(f"{p.parent.name}__{p.stem}", p) for p in sorted(layer_dir.glob("*/*.parquet"))]
+    return [(table_name(p), p) for p in sorted(layer_dir.glob("*/*.parquet"))]
 
 
 def load(settings: Settings | None = None) -> list[str]:

@@ -247,7 +247,7 @@ def situation_effects(
 
 def shap_overperformance(
     df: pd.DataFrame, feats: pd.DataFrame, n: int = 6, seed: int = 0
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Can pre-draft traits predict *beating the projection* (PIT)? Then explain with SHAP.
 
     The projection already uses draft slot, so PIT measures surprise relative to slot.
@@ -355,3 +355,37 @@ def rolling_overperformance(
     out.attrs["perm_p"] = float(np.mean(np.abs(null) >= abs(pooled)))
     out.attrs["n"] = int(ok.sum())
     return out
+
+
+VERDICTS = ["below floor", "within band", "beat ceiling"]
+
+
+def verdict_reversals(df: pd.DataFrame) -> dict[str, Any]:
+    """Year-4 Verdict vs Career Grade (year 8), each against the as-of-draft projected range
+    at the same point. 'Overturned' = the category changed; late bloomers moved up,
+    late busts moved down."""
+    d = df[df["verdict4"].notna() & df["verdict8"].notna()].copy()
+    table = pd.crosstab(d["verdict4"], d["verdict8"]).reindex(
+        index=VERDICTS, columns=VERDICTS, fill_value=0
+    )
+    rank = {v: i for i, v in enumerate(VERDICTS)}
+    move = d["verdict8"].map(rank) - d["verdict4"].map(rank)
+    d["change"] = np.select([move > 0, move < 0], ["late bloomer", "late bust"], "same")
+    k = int((move != 0).sum())
+    lo, hi = wilson(k, len(d))
+    by_pick = d.assign(band=pd.cut(d["pick"], [0, 14, 30, 60], labels=["1-14", "15-30", "31-60"]))
+    by_pick = (
+        by_pick.groupby("band", observed=True)["change"]
+        .value_counts(normalize=True)
+        .unstack(fill_value=0)
+    )
+    return {
+        "n": len(d),
+        "overturned": k / len(d),
+        "overturned_ci": (lo, hi),
+        "late_bloomers": int((move > 0).sum()),
+        "late_busts": int((move < 0).sum()),
+        "table": table,
+        "by_pick": by_pick,
+        "players": d,
+    }

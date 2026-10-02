@@ -121,8 +121,10 @@ def test_gold_set_crosswalk(con) -> None:
         actual = merged[col].fillna("")
         checked = expected != "?"  # '?' = not asserted for this player
         bad = merged[checked & (expected != actual)]
-        errors += [f"{r.bbref_id} {col}: expected {r[col + '_gold']!r} got {r[col]!r}"
-                   for _, r in bad.iterrows()]  # fmt: skip
+        errors += [
+            f"{r.bbref_id} {col}: expected {r[col + '_gold']!r} got {r[col]!r}"
+            for _, r in bad.iterrows()
+        ]
     assert not errors, "\n".join(errors)
 
 
@@ -343,3 +345,26 @@ def test_spatial_eligibility_rule(con) -> None:
     maps = scalar(con, "SELECT count(*) FROM modeled.features__shot_maps")
     elig = scalar(con, "SELECT count(*) FROM modeled.features__shot_coverage WHERE xy_eligible")
     assert maps == elig
+
+
+# ----------------------------------------------------------------------- phase 6
+def test_pit_in_unit_interval_and_verdicts_consistent(con) -> None:
+    p = q(con, "SELECT * FROM modeled.phase6__player_outcomes_vs_projection")
+    for n in (4, 6, 8):
+        d = p[p[f"pit{n}"].notna()]
+        assert d[f"pit{n}"].between(0, 1).all()
+        assert (
+            d.loc[d[f"verdict{n}"] == "beat ceiling", f"actual{n}"]
+            > d.loc[d[f"verdict{n}"] == "beat ceiling", f"ceiling{n}"]
+        ).all()
+        assert (
+            d.loc[d[f"verdict{n}"] == "below floor", f"actual{n}"]
+            < d.loc[d[f"verdict{n}"] == "below floor", f"floor{n}"]
+        ).all()
+
+
+def test_projections_used_for_verdicts_are_well_calibrated_overall(con) -> None:
+    # If draft-night ranges are calibrated, mean PIT ~ 0.5 (Phase 6 analyses rely on this).
+    p = q(con, "SELECT pit4, pit6, pit8 FROM modeled.phase6__player_outcomes_vs_projection")
+    for col in p.columns:
+        assert abs(p[col].mean() - 0.5) < 0.03, (col, p[col].mean())
