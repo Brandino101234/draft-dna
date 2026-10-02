@@ -1,7 +1,4 @@
-"""Command-line entry point: `draft-dna <command>`.
-
-Commands for later phases are stubs that exit with a clear message.
-"""
+"""Command-line entry point: `draft-dna <command>`."""
 
 from __future__ import annotations
 
@@ -143,14 +140,36 @@ def build() -> None:
 
 
 @app.command()
-def refresh() -> None:
-    """Pull new games and regrade players during the season. Phase 7."""
-    raise typer.Exit(_not_yet("refresh", 7))
+def refresh(skip_ingest: bool = False) -> None:
+    """In-season update: re-pull current-season pages, rebuild tables, regrade, redraw cards.
 
+    Only pages for the season in progress are re-fetched (older pages are cached forever),
+    so this makes a handful of requests. Draft-night projections never change.
+    """
+    from draft_dna.build import transform as run_transform
+    from draft_dna.grading import tracker
 
-def _not_yet(command: str, phase: int) -> int:
-    log.error("`%s` is implemented in Phase %d.", command, phase)
-    return 1
+    if not skip_ingest:
+        log.info("== ingest bbref-league (current season only re-fetched)")
+        STEPS["bbref-league"]()
+    run_transform()
+    grade()
+    cards()
+    s = get_settings()
+    t = tracker.rookie_tracker(s)
+    counts = t["status"].value_counts().to_dict()
+    log.info("%d class tracker: %s", s.draft_classes.live[-1], counts)
+    movers = t[t["status"].str.startswith("pacing")].head(10)
+    for _, r in movers.iterrows():
+        log.info(
+            "  #%d %s: pace %.2f vs range %.2f-%.2f (%s)",
+            int(r["pick"]),
+            r["player_name"],
+            r["value_pace"],
+            r["projected_floor"],
+            r["projected_ceiling"],
+            r["status"],
+        )
 
 
 if __name__ == "__main__":

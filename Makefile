@@ -1,4 +1,4 @@
-.PHONY: setup lint typecheck test dq check data transform models report refresh
+.PHONY: setup lint typecheck test dq check data transform models grade app report refresh
 
 setup:  ## Install the environment
 	uv sync
@@ -27,6 +27,13 @@ transform:  ## Rebuild staging/modeled/DuckDB from cached raw data (no network)
 models:  ## Phase 3: backtest all models and build projections + comps
 	uv run draft-dna backtest
 	uv run draft-dna project
+
+grade:  ## Phase 7: grades, trajectory bands, plays-like comps, cards
+	uv run draft-dna grade
+	uv run draft-dna cards
+
+app:  ## Run the Streamlit app
+	uv run streamlit run app/app.py
 
 report:  ## Regenerate all reports/ charts and tables
 	uv run draft-dna report

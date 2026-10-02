@@ -89,7 +89,7 @@ def plays_like(
         ok = (nba_w.index != pid) & (
             np.isnan(h) | np.isnan(pool_h) | (np.abs(pool_h - h) <= MAX_HEIGHT_DIFF)
         )
-        order = np.argsort(-np.where(ok, sim, -np.inf))[:N_PLAYS_LIKE]
+        order = [j for j in np.argsort(-sim) if ok[j]][:N_PLAYS_LIKE]
         for rank, j in enumerate(order, 1):
             rows.append(
                 {
@@ -103,19 +103,29 @@ def plays_like(
     return pd.DataFrame(rows)
 
 
-def style_map(college_w: pd.DataFrame, nba_w: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
+def style_map(
+    college_w: pd.DataFrame,
+    nba_w: pd.DataFrame,
+    labels: dict[str, str] | None = None,
+    seed: int = 0,
+) -> pd.DataFrame:
     both = pd.concat([college_w.assign(source="college"), nba_w.assign(source="NBA early career")])
     x = both.drop(columns="source").to_numpy()
     xy = TSNE(n_components=2, perplexity=30, random_state=seed, init="pca").fit_transform(x)
     out = both[["source"]].copy()
     out["x"], out["y"] = xy[:, 0], xy[:, 1]
     out["dominant_style"] = both.drop(columns="source").idxmax(axis=1)
+    if labels:
+        out["dominant_style"] = out["dominant_style"].map(labels)
     return out.reset_index(names="bbref_id")
 
 
 def run(s: Settings) -> None:
     write_table(trajectory_bands(s), "modeled", "grading", "trajectory_bands", s)
-    college_w, nba_w, _ = style_spaces(s)
+    from draft_dna.features.shot_styles import describe_styles
+
+    college_w, nba_w, model = style_spaces(s)
+    labels = describe_styles(model).set_index("style")["label"].to_dict()
     players = read_table("modeled", "core", "players", s).set_index("bbref_id")
     feats = read_table("modeled", "features", "predraft", s).set_index("bbref_id")
     heights = feats["height_in"].astype(float)
@@ -125,7 +135,7 @@ def run(s: Settings) -> None:
     write_table(pl, "modeled", "grading", "plays_like", s)
     write_table(college_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_college", s)
     write_table(nba_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_nba", s)
-    sm = style_map(college_w, nba_w)
+    sm = style_map(college_w, nba_w, labels)
     sm["player_name"] = sm["bbref_id"].map(players["player_name"])
     write_table(sm, "modeled", "grading", "style_map", s)
     log.info("extras: %d plays-like rows, %d players on the style map", len(pl), len(sm))

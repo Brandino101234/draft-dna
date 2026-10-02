@@ -51,3 +51,19 @@ def test_measurement_model_recovers_simulated_relationship() -> None:
 )
 def test_status_labels(n: int, retired: bool, expected: str) -> None:
     assert B.status(n, retired) == expected
+
+
+def test_plays_like_picks_nearest_style_within_height_and_never_self() -> None:
+    import pandas as pd
+
+    from draft_dna.grading.extras import plays_like
+
+    nba = pd.DataFrame(
+        [[1.0, 0.0], [0.9, 0.1], [0.95, 0.05], [0.0, 1.0]],
+        index=["self", "tall_twin", "near", "far"],
+    )
+    heights = pd.Series({"self": 78.0, "tall_twin": 85.0, "near": 79.0, "far": 77.0})
+    out = plays_like(nba, nba, heights, pd.Index(["self"]), use_nba_for=nba.index)
+    ids = out["plays_like_id"].tolist()
+    assert "self" not in ids and "tall_twin" not in ids  # 7 inches taller is filtered out
+    assert ids[0] == "near" and out["basis"].eq("NBA shots").all()
