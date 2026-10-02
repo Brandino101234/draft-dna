@@ -143,3 +143,33 @@ Decision (user, after review): two-tier design (D026).
 **Comps guardrail:** shot-based comps must be within 3 inches of height and share the position bucket (`GuardedKnn`).
 
 **NBA shot charts:** stats.nba.com shot charts for each player's first 4 NBA seasons (2.24M shots, 2,424 players) are standardized into the same frame for Phase 7's "plays like" comps. stats.nba.com throttles sustained pulls, so it is accessed at 3.5 s/request with retries, and any player-season that keeps failing is skipped.
+
+### D027: Phase 5 pre-registration (written and committed before any Phase 5 model was run)
+**Question.** Does *how* a prospect scores (Shot DNA) predict NBA success better than box-score stats, and does it add anything beyond draft position?
+
+**Cohort.** Drafted college players with ≥100 shot-type field-goal attempts (Barttorvik splits, available from the 2010 class). Every model is trained and tested on this cohort only, so the comparison is identical across models.
+
+**Design B (primary, user choice).** Target = best 3-season value through year 4 (`y_peak4`). Strict leakage rule: class c trains test year Y only if c + 4 ≤ Y (outcome known by draft night). Test years 2014–2022 (~417 players).
+
+**Design A (sensitivity check).** Target = year-6 peak (`y_peak6`). Train on classes drafted before Y (c < Y), even though their 6-year outcomes complete later. Test years 2012–2020. It uses information that was not available on draft night, so it is a robustness check only.
+
+**Feature sets.**
+- `stats`: Phase 3 pre-draft stats, age, size, combine
+- `shot`: tier-A Shot DNA (rim/mid/three mix, dunk share, era-relative 3PA rate, EB zone FG% and their era-relative versions, assisted shares by type, unassisted share)
+- `stats+shot`
+
+**Models** (hyperparameters frozen from Phase 3; nothing tuned except where stated):
+1. Pick only + conformal (Phase 3 model of record; baseline a)
+2. kNN comps on `stats` (baseline b), on `shot` (size/position guardrail), and on `stats+shot`, where the combined distance is w·d_stats + (1−w)·d_shot, with w ∈ {0, 0.25, 0.5, 0.75, 1} chosen on test years 2014–2017 and reported on 2018–2022
+3. LightGBM quantile (Phase 3 config) on `stats`, `shot`, `stats+shot` without pick
+4. LightGBM quantile on pick + `stats`, pick + `shot`, pick + `stats+shot`
+
+**Pre-registered comparisons** (CRPS; 95% paired bootstrap CI over players):
+- **H1, beyond draft position:** LightGBM pick + `stats+shot` vs pick + `stats`
+- **H2, how vs how much:** LightGBM `shot` vs `stats` vs `stats+shot` (no pick)
+- **H3, the bar:** the best shot-informed model vs pick only + conformal
+- **Secondary metrics:** pinball loss (floor, median, ceiling), Brier score for P(bust) and P(All-Star level), coverage
+- **Subgroups (descriptive, with CIs):** position (guard / forward / big) and pick band (1–14, 15–30, 31–60)
+- **Tier-B spatial test (exploratory):** coordinate-eligible subset, adding zone shares and NMF style weights (NMF refit inside each fold) to pick + `stats`
+
+**Decision rule.** Shot data "helps" only if a model's CRPS beats its no-shot counterpart with a 95% CI that excludes zero under design B. The model of record changes only if a shot-informed model also beats pick only + conformal that way. Results are reported whether positive, null or negative.
