@@ -10,10 +10,10 @@ from typing import Any
 import pandas as pd
 from nba_api.stats.endpoints import (
     commonallplayers,
-    shotchartdetail,
     commonplayerinfo,
     draftcombinestats,
     drafthistory,
+    shotchartdetail,
 )
 
 from draft_dna.config import Settings
