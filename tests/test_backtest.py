@@ -175,3 +175,16 @@ def test_spatial_model_fills_style_weights_only_for_players_with_maps() -> None:
     assert styles.iloc[:2].notna().all().all()  # players with maps get weights
     assert styles.iloc[2].isna().all()  # and players without a map stay missing
     assert np.allclose(styles.iloc[:2].sum(axis=1), 1.0)
+
+
+def test_pit_is_uniform_for_calibrated_predictions_and_handles_point_mass() -> None:
+    from draft_dna.eval.phase6 import pit
+
+    rng = np.random.default_rng(0)
+    y = rng.normal(0, 1, 2000)
+    q = np.tile(norm.ppf(M.QS), (len(y), 1))
+    p = pit(q, y)
+    assert abs(p.mean() - 0.5) < 0.02 and abs((p < 0.25).mean() - 0.25) < 0.03
+    # 40% of mass exactly at 0: an outcome of 0 sits in the middle of that mass.
+    q0 = np.where(M.QS <= 0.4, 0.0, M.QS - 0.4)[None, :]
+    assert pit(q0, np.array([0.0]))[0] == pytest.approx(0.2, abs=0.01)

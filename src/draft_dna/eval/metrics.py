@@ -36,6 +36,11 @@ def crps(y: np.ndarray, qpred: np.ndarray) -> np.ndarray:
     return 2 * losses.mean(axis=1)
 
 
+def cdf_at_each(qpred: np.ndarray, t: np.ndarray) -> np.ndarray:
+    """P(Y <= t_i) for row i, each row with its own threshold (used for PIT scores)."""
+    return np.array([cdf_at(qpred[i : i + 1], float(t[i]))[0] for i in range(len(qpred))])
+
+
 def cdf_at(qpred: np.ndarray, t: float) -> np.ndarray:
     """P(Y <= t) for each row, by inverting the quantile grid.
 
