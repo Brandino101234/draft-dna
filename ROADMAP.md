@@ -22,11 +22,11 @@
 - [x] `make data` end-to-end; coverage report in `reports/phase1/`
 
 ## Phase 2: Define "better" (`phase-2-outcomes`)
-- [ ] `outcomes_through_n` table (same-point cumulative and peak value)
-- [ ] Three candidate composites; validate vs awards and 2nd-contract % of cap
-- [ ] Early-career outcomes (Y3, Y4)
-- [ ] Tier mapping: Out of league / Bust / Rotation / Starter / All-Star / All-NBA
-- [ ] Survival analysis of career length with censoring
+- [x] `outcomes_through_n` table (same-point cumulative and peak value, zero-filled seasons)
+- [x] Three candidate composites; validated vs awards and 2nd-contract % of cap (bootstrap CIs)
+- [x] Early-career outcomes (Y3, Y4)
+- [x] Tier mapping: Out of league / Bust / Rotation / Starter / All-Star / All-NBA (calibrated cutoffs)
+- [x] Survival analysis of career length with censoring (Kaplan-Meier, Cox split at rookie deal)
 
 ## Phase 3: Stats comps and outcome bands, MVP (`phase-3-comps-bands`)
 - [ ] Rolling-origin backtest harness with leakage tests

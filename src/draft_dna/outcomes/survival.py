@@ -71,18 +71,47 @@ def kaplan_meier(careers: pd.DataFrame, horizon: int = 20) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def cox(careers: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-    """Hazard ratios for pick (log scale), age at draft, era and pre-draft background."""
+ROOKIE_DEAL_SEASONS = 4
+COX_COVARIATES = ["log2_pick", "age_at_draft", "draft_year_10", "non_college"]
+
+
+def _cox_frame(careers: pd.DataFrame) -> pd.DataFrame:
     d = careers.dropna(subset=["age_at_draft"]).copy()
     d = d[d["duration"] > 0]  # never-played players have no NBA career to end
     d["log2_pick"] = np.log2(d["pick_overall"])
     d["age_at_draft"] = d["age_at_draft"] - 20
     d["draft_year_10"] = (d["draft_year"] - 2010) / 10
     d["non_college"] = (d["prospect_source"] != "college").astype(int)
-    cols = ["log2_pick", "age_at_draft", "draft_year_10", "non_college"]
-    cph = CoxPHFitter(penalizer=0.01).fit(
-        d[[*cols, "duration", "ended"]], duration_col="duration", event_col="ended"
+    return d
+
+
+def _fit(d: pd.DataFrame) -> CoxPHFitter:
+    return CoxPHFitter(penalizer=0.01).fit(
+        d[[*COX_COVARIATES, "duration", "ended"]], duration_col="duration", event_col="ended"
     )
-    summ = cph.summary[["exp(coef)", "exp(coef) lower 95%", "exp(coef) upper 95%", "p"]]
-    summ.columns = ["hazard_ratio", "ci_low", "ci_high", "p"]
-    return summ.reset_index(names="covariate"), float(cph.concordance_index_)
+
+
+def cox(careers: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+    """Hazard ratios, fit separately for the rookie-deal years and afterwards.
+
+    A single Cox model fails the proportional-hazards test for draft pick: pick matters
+    far more early (teams give high picks more chances on rookie deals) than later. So:
+    - "seasons 1-4": careers followed through season 4 (ending later = censored at 4)
+    - "seasons 5+":  players still in the league after season 4, clock restarted at 4
+    """
+    d = _cox_frame(careers)
+    k = ROOKIE_DEAL_SEASONS
+    early = d.assign(ended=d["ended"] & (d["duration"] <= k), duration=d["duration"].clip(upper=k))
+    late = d[d["duration"] > k].assign(duration=lambda x: x["duration"] - k)
+    rows = []
+    concordance = []
+    for period, frame in (("seasons 1-4", early), ("seasons 5+", late)):
+        cph = _fit(frame)
+        concordance.append(float(cph.concordance_index_))
+        summ = cph.summary[["exp(coef)", "exp(coef) lower 95%", "exp(coef) upper 95%", "p"]]
+        summ.columns = ["hazard_ratio", "ci_low", "ci_high", "p"]
+        summ = summ.reset_index(names="covariate")
+        summ.insert(0, "period", period)
+        summ["n_players"] = len(frame)
+        rows.append(summ)
+    return pd.concat(rows, ignore_index=True), float(np.mean(concordance))

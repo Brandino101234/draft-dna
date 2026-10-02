@@ -14,6 +14,11 @@ NBA draft analytics. For every prospect (draft classes 1996–2026), find histor
 6. **Censoring.** 2022–2025 careers are unfinished. Use survival methods for career length and never label them "short careers".
 7. Players with zero NBA minutes stay in the data as "Out of league". Never drop them.
 
+## Outcome conventions (Phase 2)
+- The canonical outcome is `career_value` / `composite_blend`: 75% z(best 3-season blend value) + 25% z(total), at the same N, scaled on training classes (DECISIONS D016).
+- Tiers are cutoffs on `peak3_blend` (D017); read cutoffs from `data/modeled/outcomes/params.json`, never hardcode them.
+- Seasons out of the league count as zero. Always use `modeled.outcomes__outcomes_through_n` at matching N.
+
 ## Draft class roles
 - 1996–2021: training and backtesting
 - 2022–2025: in-progress, provisional grades
