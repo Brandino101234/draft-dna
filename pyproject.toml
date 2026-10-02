@@ -22,6 +22,9 @@ dependencies = [
     "tabulate>=0.10.0",
     "scikit-learn>=1.9.1",
     "lifelines>=0.30.3",
+    "lightgbm>=4.7.0",
+    "ngboost>=0.5.11",
+    "pymc>=6.3.2",
 ]
 
 [project.scripts]
@@ -67,3 +70,8 @@ addopts = "-m 'not dq'"
 [[tool.mypy.overrides]]
 module = ["pandas.*", "nba_api.*", "cbbpy.*", "lifelines.*", "sklearn.*", "scipy.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
 ignore_missing_imports = true
+
+# Numerical code returns pandas/numpy values that mypy sees as Any (pandas is untyped, D011).
+[[tool.mypy.overrides]]
+module = ["draft_dna.eval.*", "draft_dna.models.*", "draft_dna.features.*", "draft_dna.outcomes.*"]
+warn_return_any = false
