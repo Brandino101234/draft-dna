@@ -56,13 +56,13 @@ def test_derived_usage_matches_formula_and_keeps_published_values() -> None:
         {
             "fga": [400.0, 400.0], "fta": [100.0, 100.0], "tov": [60.0, 60.0],
             "mp": [1000.0, 1000.0], "ast": [100.0, 100.0], "fg": [180.0, 180.0],
-            "tm_g": [30, 30], "tm_mp": [6000.0, None], "tm_fga": [1800.0, 1800.0],
+            "tm_g": [30, 30], "tm_mp": [1200.0, None], "tm_fga": [1800.0, 1800.0],
             "tm_fta": [600.0, 600.0], "tm_tov": [400.0, 400.0], "tm_fg": [800.0, 800.0],
             "usg_pct": [25.0, None], "ast_pct": [None, None],
         }
     )  # fmt: skip
     out = derive_rates(df)
-    # Row 0 keeps the published usage; row 1 derives it with team minutes = 30 * 200.
+    # Row 0 keeps the published usage; row 1 derives it with game minutes = 30 * 40.
     assert out.loc[0, "usg_pct"] == 25.0 and out.loc[0, "usg_pct_source"] == "published"
     expected = 100 * (400 + 44 + 60) * 1200 / (1000 * (1800 + 264 + 400))
     assert abs(out.loc[1, "usg_pct"] - expected) < 1e-9

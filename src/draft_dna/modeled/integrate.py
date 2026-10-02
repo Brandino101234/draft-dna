@@ -130,6 +130,10 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
     out = attach_bart_seasons(
         out, universe, read_table("staging", "barttorvik", "player_seasons", s)
     )
+    # A drafted-but-unsigned player can return to college (James Nnaji: drafted 2023,
+    # Baylor 2025-26). Those seasons are post-draft and must never feed pre-draft features.
+    draft_year = out["bbref_id"].map(universe.set_index("bbref_id")["draft_year"])
+    out["is_pre_draft"] = draft_year.isna() | (out["season"] <= draft_year)
     if table_path("modeled", "era", "ncaa_era", s).exists():
         era = read_table("modeled", "era", "ncaa_era", s).set_index("season")
         out["ts_rel"] = out["ts_pct"] - out["season"].map(era["ts_pct"])
@@ -160,14 +164,14 @@ def college_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
 def derive_rates(df: pd.DataFrame) -> pd.DataFrame:
     """Usage and assist rate from player + team box totals (Basketball-Reference formulas).
 
-    Sports-Reference omits these for many pre-2010 seasons. Team minutes are missing
-    before 1999; they are approximated as games x 200 (no overtime), flagged in
-    `tm_mp_estimated`. Published values are kept when present; `*_source` says which.
+    Sports-Reference omits these for many pre-2010 seasons. Its team `mp` is *game*
+    minutes (~40 per game), i.e. the formulas' TmMP / 5. It is missing before 1999 and
+    then approximated as games x 40 (no overtime), flagged in `tm_mp_estimated`.
+    Published values are kept when present; `*_source` says which.
     """
     out = df.copy()
     out["tm_mp_estimated"] = out["tm_mp"].isna() & out["tm_g"].notna()
-    tm_mp = out["tm_mp"].fillna(out["tm_g"] * 200)
-    five = tm_mp / 5
+    five = out["tm_mp"].fillna(out["tm_g"] * 40)  # = team player-minutes / 5
     usg = (
         100
         * (out["fga"] + 0.44 * out["fta"] + out["tov"])

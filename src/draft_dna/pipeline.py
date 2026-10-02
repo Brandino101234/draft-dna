@@ -58,6 +58,14 @@ def transform() -> None:
 
 
 @app.command()
+def report() -> None:
+    """Write data coverage reports to reports/phase1/."""
+    from draft_dna.eval import coverage
+
+    coverage.run()
+
+
+@app.command()
 def build() -> None:
     """Ingest every source (cached pages are reused) and run all transforms."""
     from draft_dna.build import build_all

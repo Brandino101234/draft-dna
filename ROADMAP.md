@@ -8,17 +8,18 @@
 - [x] CI: ruff, mypy, pytest
 
 ## Phase 1: Data pipeline (`phase-1-data-pipeline`)
-- [ ] Shared fetcher: on-disk cache, per-source rate limit, retries, resumable
-- [ ] Draft picks 1996–2026 (BBRef + nba_api DraftHistory)
-- [ ] Undrafted NBA players (rosters minus draft list)
-- [ ] NBA season stats: box, advanced, playoffs, awards, team, coach, games missed
-- [ ] College stats (SR CBB) + Barttorvik (SOS, splits); derived advanced stats pre-2010
-- [ ] Combine measurements and drills
-- [ ] International / G-League stats where available; `prospect_source` flag
-- [ ] Player ID crosswalk with gold-set match-quality tests
-- [ ] Era tables (NBA and NCAA pace, 3PA rate, line distances)
-- [ ] Data-quality tests: row counts, nulls, duplicate IDs, join coverage
-- [ ] `make data` end-to-end; coverage report in `reports/`
+- [x] Shared fetcher: on-disk cache, per-source rate limit, retries, resumable
+- [x] Draft picks 1996–2026 (BBRef + nba_api DraftHistory, linked by name within year)
+- [x] Undrafted NBA players (debuted 1997+)
+- [x] NBA season stats: box, advanced, per-100, playoffs, awards, All-Stars, team, coach, games absent
+- [x] College stats (SR CBB) + Barttorvik (SOS, rim/mid splits); usage/AST% derived pre-2010
+- [x] Combine measurements and drills
+- [x] `prospect_source` flag (college / high school / international or pro team)
+- [ ] International / G League stats (deferred: no reliable source; see DECISIONS D014)
+- [x] Player ID crosswalk with gold-set match-quality tests
+- [x] Era tables (NBA and NCAA pace, 3PA rate, TS%, line distances) and era-relative columns
+- [x] Data-quality tests: row counts, nulls, duplicate IDs, join coverage
+- [x] `make data` end-to-end; coverage report in `reports/phase1/`
 
 ## Phase 2: Define "better" (`phase-2-outcomes`)
 - [ ] `outcomes_through_n` table (same-point cumulative and peak value)

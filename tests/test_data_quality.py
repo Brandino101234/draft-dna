@@ -177,3 +177,38 @@ def test_award_counts_plausible(con) -> None:
 def test_key_columns_not_null(con, table: str, cols: list[str]) -> None:
     for c in cols:
         assert scalar(con, f"SELECT count(*) FROM {table} WHERE {c} IS NULL") == 0, f"{table}.{c}"
+
+
+# --------------------------------------------------------------------- college
+def test_derived_college_rates_match_published_where_both_exist(con) -> None:
+    # Derived usage/assist rate fill pre-2010 gaps; they must reproduce the published
+    # values wherever Sports-Reference has both.
+    for stat in ("usg", "ast"):
+        mae = scalar(
+            con,
+            f"""SELECT avg(abs({stat}_pct - {stat}_pct_derived))
+            FROM modeled.core__college_player_seasons
+            WHERE {stat}_pct_source = 'published' AND {stat}_pct_derived IS NOT NULL""",
+        )
+        assert mae < 0.5, f"{stat}: mean abs diff {mae:.2f}"
+
+
+def test_barttorvik_attached_to_most_linked_college_seasons(con) -> None:
+    rate = scalar(
+        con,
+        """SELECT avg((bart_bpm IS NOT NULL)::INT) FROM modeled.core__college_player_seasons
+        WHERE season >= 2008 AND bart_pid IS NOT NULL""",
+    )
+    assert rate >= 0.90, rate
+
+
+def test_post_draft_college_seasons_are_flagged(con) -> None:
+    # Drafted-but-unsigned players can return to college (e.g. James Nnaji, drafted 2023,
+    # Baylor 2025-26). Such seasons exist but must be flagged so features exclude them.
+    bad = q(
+        con,
+        """SELECT c.bbref_id, c.season, p.draft_year
+        FROM modeled.core__college_player_seasons c JOIN modeled.core__players p USING (bbref_id)
+        WHERE p.drafted AND c.season > p.draft_year AND c.is_pre_draft""",
+    )
+    assert bad.empty, bad
