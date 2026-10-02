@@ -59,11 +59,34 @@ def transform() -> None:
 
 @app.command()
 def report() -> None:
-    """Write reports: data coverage (phase 1) and outcome definitions (phase 2)."""
-    from draft_dna.eval import coverage, outcomes_report
+    """Write reports for phases 1-3 to reports/."""
+    from draft_dna.eval import coverage, outcomes_report, phase3_report
 
     coverage.run()
     outcomes_report.run()
+    phase3_report.run()
+
+
+@app.command()
+def backtest(refresh: bool = False) -> None:
+    """Phase 3: run every model through the rolling backtest (cached unless --refresh)."""
+    from draft_dna.eval import phase3
+
+    s = get_settings()
+    phase3.predictions(s, phase3.load_frame(s), refresh=refresh)
+
+
+@app.command()
+def project() -> None:
+    """Phase 3: build per-player projections and comps (as of each draft night)."""
+    from draft_dna import db
+    from draft_dna.features import predraft
+    from draft_dna.models import projections
+
+    s = get_settings()
+    predraft.run(s)
+    projections.run(s)
+    db.load(s)
 
 
 @app.command()

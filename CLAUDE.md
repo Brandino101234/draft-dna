@@ -19,6 +19,12 @@ NBA draft analytics. For every prospect (draft classes 1996–2026), find histor
 - Tiers are cutoffs on `peak3_blend` (D017); read cutoffs from `data/modeled/outcomes/params.json`, never hardcode them.
 - Seasons out of the league count as zero. Always use `modeled.outcomes__outcomes_through_n` at matching N.
 
+## Modeling conventions (Phase 3)
+- Target `y_peak6` = best 3-season blend value through season 6. Backtests use `eval.backtest` (class c trains year Y only if c + 6 <= Y).
+- Choose models on test years 2006-2012 (`phase3.TUNING`); report 2013-2020 (`phase3.HOLDOUT`) only as the final, untouched comparison. Never tune on the holdout.
+- Model of record: `phase3.pick_conformal` (D021). A new model replaces it only if it beats it on the holdout with a CI excluding zero.
+- Every new comparison reports CRPS, pinball (floor/median/ceiling), Brier (bust, All-Star) and coverage vs both baselines.
+
 ## Draft class roles
 - 1996–2021: training and backtesting
 - 2022–2025: in-progress, provisional grades

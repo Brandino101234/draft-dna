@@ -7,6 +7,7 @@ test fails loudly instead of the model silently training on less data.
 from collections.abc import Iterator
 
 import duckdb
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -269,3 +270,34 @@ def test_censoring_rules(con) -> None:
     last_complete = get_settings().current_nba_season - 1
     active = c[c["last_season"] >= last_complete - 1]
     assert not active["ended"].any()
+
+
+# ------------------------------------------------------------------ projections
+def test_projections_are_as_of_draft_night(con) -> None:
+    bad = q(
+        con,
+        """SELECT player_name, draft_year, max_train_class FROM modeled.projections__projections
+        WHERE max_train_class + 6 > draft_year""",
+    )
+    assert bad.empty, bad
+
+
+def test_projection_bands_ordered_and_tiers_sum_to_one(con) -> None:
+    p = q(con, "SELECT * FROM modeled.projections__projections")
+    assert (p["floor"] <= p["median"]).all() and (p["median"] <= p["ceiling"]).all()
+    tiers = p[["p_out_of_league", "p_bust", "p_rotation", "p_starter", "p_all_star", "p_all_nba"]]
+    assert np.allclose(tiers.sum(axis=1), 1.0)
+    assert p["bbref_id"].is_unique
+
+
+def test_comps_come_from_earlier_classes_with_known_outcomes(con) -> None:
+    bad = q(
+        con,
+        """SELECT c.bbref_id, c.comp_id FROM modeled.projections__comps c
+        JOIN modeled.core__players p USING (bbref_id)
+        WHERE c.comp_draft_year >= p.draft_year OR c.comp_peak6 IS NULL
+           OR c.comp_id = c.bbref_id""",
+    )
+    assert bad.empty, bad
+    per = q(con, "SELECT bbref_id, count(*) n FROM modeled.projections__comps GROUP BY 1")
+    assert (per["n"] == 15).all()

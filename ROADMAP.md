@@ -29,13 +29,13 @@
 - [x] Survival analysis of career length with censoring (Kaplan-Meier, Cox split at rookie deal)
 
 ## Phase 3: Stats comps and outcome bands, MVP (`phase-3-comps-bands`)
-- [ ] Rolling-origin backtest harness with leakage tests
-- [ ] Baselines: pick-only, standardized kNN
-- [ ] Learned similarity (weighted kNN, tree proximity) + sanity-check comps
-- [ ] LightGBM quantile, NGBoost, PyMC hierarchical
-- [ ] Conformal calibration of intervals
-- [ ] Evaluation: pinball, CRPS, Brier, calibration, coverage, all vs baselines
-- [ ] Per-player output: top-15 comps, floor/median/ceiling, tier probabilities
+- [x] Rolling-origin backtest harness with leakage tests (tuning 2006-2012, holdout 2013-2020)
+- [x] Baselines: pick-only, standardized kNN
+- [x] Learned similarity (weighted kNN, tree proximity) + sanity-check comps
+- [x] LightGBM quantile, NGBoost, PyMC hierarchical (Tobit), quantile blends
+- [x] Conformal calibration of intervals
+- [x] Evaluation: pinball, CRPS, Brier, calibration, coverage, all vs baselines with bootstrap CIs
+- [x] Per-player output: top-15 comps, floor/median/ceiling, tier probabilities
 
 ## Phase 4: Shot audit and Shot DNA (`phase-4-shot-dna`)
 - [ ] Coverage audit by season, conference, player → **stop and report**

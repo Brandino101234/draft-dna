@@ -108,3 +108,56 @@ Median career length: 14 seasons for picks 1–5, 11 for 6–14, 8 for 15–30, 
 ### Limits
 - The validation targets (awards, peak pay) favor peak performance, so they can't fully settle how much longevity should count. The 75/25 weighting is a judgment call, recorded in D016.
 - A career counts as "ended" when the player has missed two straight seasons, so a player on a long injury absence could be misclassified.
+
+## Phase 3: Comps and outcome ranges from pre-draft stats
+
+**Question:** Using only what's known on draft night, can we predict a range of outcomes for each prospect better than draft position alone?
+
+**Setup:**
+- **Target:** best 3-season value through year 6, which ranks players almost identically to their career peak.
+- **Backtest:** rolling-origin, one fold per draft year. A model for class Y trains only on classes whose 6-year outcomes were complete by draft night of Y.
+- **Selection vs. testing:** every modeling choice was made on 2006–2012. The 2013–2020 holdout was scored once.
+
+**Baselines:**
+- **(a)** draft-slot history: the outcomes of the 60 historically nearest picks
+- **(b)** k-nearest-neighbor comps on standardized pre-draft stats, age and physical profile
+
+**Models tried:**
+- LightGBM quantile regression
+- NGBoost
+- Bayesian hierarchical censored (Tobit) regression with partial pooling by position, era and pick range
+- Learned-similarity comps (ridge-weighted and tree-proximity)
+- Quantile blends
+- Conformal calibration
+
+![Model comparison](reports/phase3/model_comparison.png)
+
+**Finding: pre-draft box-score stats did not beat draft position.**
+- On the holdout, the best stats-based model (a blend of pick history, LightGBM and the Bayesian model) tied draft-slot history (CRPS 0.331 vs 0.331; difference CI −0.009 to +0.008).
+- On the tuning years the same blend looked 5% better, an illusion the held-out years exposed.
+- Stats-only comps were significantly *worse* than draft slot (+0.040).
+- Teams' draft order already absorbs what college box scores say. This sets up the headline question for Phases 4–5: does *how* a prospect scores add information that box scores don't?
+
+The model of record is therefore the simplest one: **draft-slot history with conformal calibration.** It is also the best calibrated: on the holdout, 23.7% of players finished below their floor (target 25%) and 9.8% above their ceiling (target 10%).
+
+![Calibration](reports/phase3/calibration.png)
+
+**Where it misses:** for top picks, P(All-Star or better) ran high in 2013–2020. Predictions near 43% came true about 20% of the time.
+
+### Comps
+Each prospect gets 15 comps from earlier draft classes, ranked by similarity in pre-draft stats, age and size. Each comp comes with a similarity score and the features that make the two players alike. A first version failed the sanity check: players missing most stats looked similar to everyone. A feature-overlap rule fixed it:
+
+| Prospect | Top comps |
+|---|---|
+| Kevin Durant | Carmelo Anthony, Paul Pierce, Tim Thomas |
+| Anthony Davis | Chris Bosh, LaMarcus Aldridge, Elton Brand |
+| Shai Gilgeous-Alexander | Russell Westbrook, John Wall, Derrick Rose, Kyle Lowry |
+| Cooper Flagg | Luol Deng, Carmelo Anthony, Thaddeus Young |
+| AJ Dybantsa | RJ Barrett, Jabari Parker, Carmelo Anthony |
+
+Comps are context, not the forecast. Stats-only comps are a poor guide to outcomes: Curry's and Lillard's nearest comps mostly flamed out.
+
+### 2026 class
+![2026 bands](reports/phase3/draft_2026_bands.png)
+
+Full tables are in [reports/phase3/phase3_results.md](reports/phase3/phase3_results.md).
