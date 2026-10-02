@@ -11,6 +11,7 @@ polite (1 request/second), cached, and for personal, non-commercial research onl
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import pandas as pd
@@ -122,7 +123,18 @@ def game_shots(fetcher: Fetcher, game_id: int) -> tuple[pd.DataFrame, pd.DataFra
 SCHOOL_OVERRIDES = {
     "illinois-chicago": 82, "loyola-il": 2350, "appalachian-state": 2026, "loyola-md": 2352,
     "college-of-charleston": 232, "tennessee-martin": 2630, "southern-mississippi": 2572,
+    "miami-fl": 2390, "miami-oh": 193,
 }  # fmt: skip
+
+
+def _qualifier_penalty(candidates: list[str], location: str) -> float:
+    """'Miami (OH)' must not match plain 'Miami (FL)': name cleanup strips parentheticals,
+    so require an ESPN qualifier like '(OH)' to appear in the Sports-Reference name."""
+    m = re.search(r"\(([^)]+)\)", location or "")
+    if not m:
+        return 0.0
+    qual = m.group(1).lower()
+    return 0.0 if any(qual in c.lower() for c in candidates) else 50.0
 
 
 def map_schools(slugs: list[str], names: dict[str, str], espn_teams: pd.DataFrame) -> pd.DataFrame:
@@ -135,7 +147,9 @@ def map_schools(slugs: list[str], names: dict[str, str], espn_teams: pd.DataFram
             rows.append((slug, SCHOOL_OVERRIDES[slug], 100.0, "manual"))
             continue
         cands = [x for x in (names.get(slug), slug.replace("-", " ")) if x]
-        scores = espn_teams["location"].map(lambda loc, c=cands: max(school_sim(x, loc) for x in c))
+        scores = espn_teams["location"].map(
+            lambda loc, c=cands: max(school_sim(x, loc) for x in c) - _qualifier_penalty(c, loc)
+        )
         best = scores.idxmax()
         rows.append((slug, int(espn_teams.loc[best, "espn_team_id"]), float(scores[best]), "name"))
     out = pd.DataFrame(rows, columns=["school_slug", "espn_team_id", "score", "method"])
