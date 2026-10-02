@@ -124,7 +124,7 @@ def clickable(df: pd.DataFrame, key: str, **kwargs: object) -> None:
     event = st.dataframe(
         df.drop(columns="bbref_id"),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         on_select="rerun",
         selection_mode="single-row",
         key=key,
@@ -218,7 +218,7 @@ if page == "player":
     except Exception:
         share = f"?player={pid}"
     st.caption(f"Link to this card: {share}")
-    st.image(card_path(pid), use_container_width=True)
+    st.image(card_path(pid), width="stretch")
 
     left, right = st.columns(2)
     comps = data["comps"][data["comps"]["bbref_id"] == pid].sort_values("rank")
@@ -260,7 +260,7 @@ if page == "player":
         right.dataframe(
             pl[["rank", "plays_like_name", "style_similarity", "basis"]],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     if year != "All years":
         st.subheader(f"The {year} draft class")
@@ -314,7 +314,7 @@ elif page == "redraft":
     top = len(cls)
     fig.add_shape(type="line", x0=1, y0=1, x1=top, y1=top, line={"dash": "dot", "color": "#999"})
     fig.update_yaxes(autorange="reversed")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.caption("Above the dotted line = drafted too late; below = drafted too early.")
     show = cls if st.toggle("Show both rounds", value=False) else cls.head(30)
     clickable(
@@ -436,11 +436,11 @@ elif page == "teams":
     )
     fig.update_traces(marker_color="#2a78d6")
     fig.update_yaxes(autorange="reversed")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.dataframe(
         agg.drop(columns=["sd", "se"]),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "value_vs_slot": st.column_config.NumberColumn(
                 "Avg value vs slot (vs league)", format="%+.2f"
@@ -488,9 +488,9 @@ elif page == "compare":
         },
         index=list(rows),
     )
-    st.dataframe(table, use_container_width=True)
-    a.image(card_path(pa), use_container_width=True)
-    b.image(card_path(pb), use_container_width=True)
+    st.dataframe(table, width="stretch")
+    a.image(card_path(pa), width="stretch")
+    b.image(card_path(pb), width="stretch")
 
 elif page == "styles":
     st.subheader("Every player's shot style, in 2D")
@@ -535,7 +535,7 @@ elif page == "styles":
         marker={"size": 13, "color": "white", "line": {"width": 2, "color": "black"}},
     )
     fig.update_layout(xaxis_visible=False, yaxis_visible=False, legend_title_text="Dominant style")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 elif page == "tracker":
     st.subheader("2026 class: projection vs reality")
@@ -575,7 +575,7 @@ elif page == "tracker":
         marker={"symbol": "line-ns", "size": 14, "color": "#2a78d6", "line": {"width": 2}},
         name="projected median",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.dataframe(
         t[
             [
@@ -593,7 +593,7 @@ elif page == "tracker":
             ]
         ],
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 
 else:
