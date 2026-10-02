@@ -109,3 +109,17 @@ def test_cached_json_calls_library_once(settings: Settings) -> None:
     assert cached_json("nba_api", "draft_history", call, settings=settings, sleep=noop) == {"a": 1}
     assert cached_json("nba_api", "draft_history", call, settings=settings, sleep=noop) == {"a": 1}
     assert len(calls) == 1
+
+
+def test_cached_json_retries_transient_failures(settings: Settings) -> None:
+    attempts = []
+
+    def flaky() -> dict[str, int]:
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")  # throttled HTML
+        return {"ok": 1}
+
+    noop = lambda s: None  # noqa: E731
+    assert cached_json("nba_api", "flaky", flaky, settings=settings, sleep=noop) == {"ok": 1}
+    assert len(attempts) == 3
