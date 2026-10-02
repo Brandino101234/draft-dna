@@ -82,3 +82,32 @@ A career has ended if the player has not appeared in either of the last two comp
 
 ### D019: Cox model split at the rookie deal
 A single Cox model fails the proportional-hazards test for draft pick (p < 0.0001): pick matters far more during the rookie deal than afterwards. Fitting seasons 1–4 and seasons 5+ separately: each doubling of pick number multiplies the yearly hazard of a career ending by 2.07 (1.83–2.34) in seasons 1–4 but only 1.16 (1.09–1.24) afterwards; age at draft matters more later (1.26 per year vs 1.11). The seasons-5+ model passes the assumption test; the seasons 1–4 hazard ratio for pick is an average over those years (second-rounders mostly leave in years 1–2).
+
+### D020: Phase 3 target and evaluation design
+- **Target:** best 3-season value through season 6 after the draft. By year 6 the median player has reached his career peak, and the year-6 peak ranks players almost identically to the career peak (Spearman 0.98 vs. through year 14), while letting classes through 2020 be scored.
+- **No leakage:** the model for draft class Y trains only on classes with c + 6 ≤ Y (outcome complete by draft night). `split()` asserts this; a data-quality test checks every projection row. Tier cutoffs and the blend metric's scale are fixed definitions computed in Phase 2 (they use all training classes but no player-level information).
+- **Tuning vs holdout:** every modeling choice (hyperparameters, transforms, blend weights) was made on test years 2006–2012 only. 2013–2020 was scored once, at the end. This mattered: the blend's 5% edge on the tuning years disappeared on the holdout.
+
+### D021: Model of record = draft-slot history + conformal calibration
+Holdout (2013–2020, 480 players), CRPS difference vs pick only, 95% paired bootstrap CI:
+
+| model | CRPS | vs pick only | below floor (25%) | above ceiling (10%) |
+|---|---|---|---|---|
+| Pick only | 0.331 | — | 23.5% | 10.2% |
+| Pick only + conformal | 0.332 | +0.002 (−0.002, +0.005) | 23.7% | 9.8% |
+| Final blend (pick + LightGBM + Bayes) | 0.331 | +0.000 (−0.009, +0.008) | 31.3% | 8.3% |
+| LightGBM quantile (pick + stats) | 0.334 | +0.003 (−0.009, +0.014) | 31.0% | 9.2% |
+| Bayesian hierarchical Tobit | 0.360 | +0.029 (+0.011, +0.047) | 27.2% | 6.9% |
+| Stats kNN (baseline b) | 0.371 | +0.040 (+0.018, +0.064) | 26.5% | 8.4% |
+| NGBoost | 0.384 | +0.053 (+0.036, +0.072) | 51.0% | 19.0% |
+
+No model using pre-draft box-score stats beat the draft pick alone on the holdout, so per the baselines-first rule the simpler model is kept. Conformal calibration is added because it keeps the accuracy of pick-only while giving the best calibration in both periods (tuning: 23.7% / 10.5%; holdout: 23.7% / 9.8%). Known weakness: for the top picks, P(All-Star or better) runs high in the holdout (predicted ~43%, observed ~20%), consistent with 2013–2020 top picks reaching All-Star value by year 6 less often than history implied.
+
+### D022: Comps = standardized stats kNN with a feature-overlap guard
+The first comps failed the sanity check: players missing most college stats (JUCO, Division II, never played) were "close" to everyone on the one or two features they had ("hubness") and appeared as comps for Curry, Zion, Durant, etc. Fix: a historical player can only be a comp if he shares ≥70% of the prospect's available features (others are pushed behind every eligible comp). Comps became sensible (Durant → Carmelo/Pierce; Anthony Davis → Bosh/Aldridge/Brand; SGA → Westbrook/Wall/Rose). The fix made the comps' outcome spread slightly *less* predictive (holdout CRPS 0.361 → 0.371): the hubs were mostly busts and pulled predictions toward realistic outcomes for the wrong reason. Learned similarity: tree-proximity comps beat stats kNN on the tuning years (−0.024, CI excludes 0) but not on the holdout (−0.013, CI −0.028 to +0.002), so the simpler kNN is kept. Comps are descriptive context; the forecast comes from D021.
+
+### D023: Imputation inside folds neutralizes absent features
+Features with fewer than 30 observed values in a fold's training data (e.g. BPM before 2008) are set to the training median for that fold, and standardized values are clipped to ±5. Without this, a test player's raw BPM entered the Bayesian model unscaled and produced ceilings in the thousands.
+
+### D024: Non-college prospects
+International and high-school prospects have only age, size and (sometimes) combine data, so their stats comps are physical-profile comps (LeBron → other high-school bigs; Wembanyama → tall international players). Their projections come from draft slot like everyone else's.
