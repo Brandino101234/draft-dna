@@ -109,6 +109,9 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
         if rows.any():
             pq[rows] = zcal[n].quantiles(B.Posterior(mean[rows], sd[rows], weight[rows]))
     pq[final] = (B.s(obs_final[final]) ** 2)[:, None]
+    # Peak value through year 8 can never be below the peak already reached.
+    reached = np.nan_to_num(out["peak_so_far"].to_numpy(dtype=float), nan=0.0)
+    pq = np.maximum(pq, reached[:, None])
 
     out["projected_floor"] = grid[:, M.qidx(M.FLOOR)]
     out["projected_median"] = grid[:, M.qidx(M.MEDIAN)]

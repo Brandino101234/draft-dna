@@ -100,6 +100,41 @@ def project() -> None:
 
 
 @app.command()
+def grade() -> None:
+    """Phase 7: grade every player and build trajectory bands, plays-like comps, style map."""
+    from draft_dna import db
+    from draft_dna.grading import extras
+    from draft_dna.grading import run as grading
+
+    s = get_settings()
+    grading.run(s)
+    extras.run(s)
+    db.load(s)
+
+
+SAMPLE_CARDS = ["dybanaj01", "peterda02", "boozeca02", "flaggco01", "wembavi01", "banchpa01"]
+
+
+@app.command()
+def cards(all_recent: bool = True) -> None:
+    """Phase 7: render prospect cards (2022-2026 classes) and refresh the sample cards."""
+    from draft_dna.ingest.storage import read_table
+    from draft_dna.viz import cards as card_viz
+
+    s = get_settings()
+    grades = read_table("modeled", "grading", "grades", s)
+    ids = grades.loc[grades["draft_year"] >= 2022, "bbref_id"].tolist() if all_recent else []
+    out = card_viz.render_many(s, ids, s.paths.modeled / "cards")
+    card_viz.render_many(s, SAMPLE_CARDS, s.paths.reports / "cards")
+    log.info(
+        "rendered %d cards to %s (+ %d samples in reports/cards)",
+        len(out),
+        s.paths.modeled / "cards",
+        len(SAMPLE_CARDS),
+    )
+
+
+@app.command()
 def build() -> None:
     """Ingest every source (cached pages are reused) and run all transforms."""
     from draft_dna.build import build_all
