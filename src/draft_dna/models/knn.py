@@ -159,3 +159,28 @@ class TreeProximityKnn(_NeighborModel):
         lt = np.asarray(self.gbm.predict(test[self.features], pred_leaf=True))
         same = (lt[:, None, :] == self.leaves[None, :, :]).mean(axis=2)
         return 1.0 - same  # 0 = always in the same leaf
+
+
+class GuardedKnn(StatsKnn):
+    """kNN with a size/position guardrail: a comp must be within MAX_HEIGHT_DIFF inches
+    and share the position bucket, otherwise it is pushed behind every eligible comp.
+    Prevents shot-profile comps between, say, a 6'1" guard and a 6'10" big who both
+    live at the rim."""
+
+    name = "Guarded kNN"
+    MAX_HEIGHT_DIFF = 3.0
+
+    def _fit_space(self, train: pd.DataFrame, y: np.ndarray) -> None:
+        super()._fit_space(train, y)
+        self.height = train["height_in"].to_numpy(dtype=float)
+        self.pos = train["position"].to_numpy()
+
+    def _distances(self, test: pd.DataFrame) -> np.ndarray:
+        d = super()._distances(test)
+        th = test["height_in"].to_numpy(dtype=float)
+        tp = test["position"].to_numpy()
+        too_far = np.abs(th[:, None] - self.height[None, :]) > self.MAX_HEIGHT_DIFF
+        other_pos = tp[:, None] != self.pos[None, :]
+        unknown = np.isnan(th)[:, None] | np.isnan(self.height)[None, :]
+        d[(too_far & ~unknown) | other_pos] += self.OVERLAP_PENALTY
+        return d
