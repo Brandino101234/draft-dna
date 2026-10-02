@@ -78,7 +78,8 @@ def summary(pid: str) -> None:
     c1.metric(
         "Grade",
         g["grade"],
-        help="vs draft-night range: A > ceiling, B > median, C > floor, D < floor",
+        help="Career peak (incl. playoffs; All-Star/All-NBA set a minimum) vs the "
+        "draft-night range for his slot: A > ceiling, B > median, C > floor, D < floor",
     )
     c2.metric("Status", g["status"])
     c3.metric("Confidence", f"{g['confidence']:.0%}")
@@ -90,13 +91,28 @@ def summary(pid: str) -> None:
 
 
 if page == "Player card":
-    choice = st.selectbox("Search a player", list(options), index=0)
+    years = sorted(grades["draft_year"].unique(), reverse=True)
+    c_year, c_player = st.columns([1, 3])
+    year = c_year.selectbox("Draft class", ["All years", *years])
+    pool = grades if year == "All years" else grades[grades["draft_year"] == year]
+    names = [label(r) for _, r in pool.iterrows()]
+    choice = c_player.selectbox(
+        "Player (type to search)", names, index=0, placeholder="Start typing a name"
+    )
     pid = options[choice]
     summary(pid)
+    if grades.set_index("bbref_id").loc[pid, "projection_type"] == "retrospective":
+        st.caption(
+            "Retrospective projection: our data starts in 1996, so this class had too few "
+            "earlier drafts to project from. Its range comes from how players at the same "
+            "draft slot did in other drafts, so it uses hindsight."
+        )
     st.image(card_path(pid), use_container_width=True)
     left, right = st.columns(2)
     comps = data["comps"][data["comps"]["bbref_id"] == pid].sort_values("rank")
     left.subheader("Top 15 comps (pre-draft stats, age, size)")
+    if comps.empty:
+        left.caption("No comps: there are no earlier draft classes in the data.")
     left.dataframe(
         comps[
             [
@@ -111,6 +127,7 @@ if page == "Player card":
         ],
         hide_index=True,
         use_container_width=True,
+        column_config={"comp_peak6": "Comp peak (yr 6)", "comp_name": "Comp"},
     )
     pl = data["plays_like"][data["plays_like"]["bbref_id"] == pid].sort_values("rank")
     right.subheader("Plays like (stylistic only)")
@@ -122,6 +139,26 @@ if page == "Player card":
         hide_index=True,
         use_container_width=True,
     )
+    if year != "All years":
+        st.subheader(f"The {year} draft class")
+        st.dataframe(
+            pool[
+                [
+                    "pick",
+                    "player_name",
+                    "grade",
+                    "status",
+                    "projected_median",
+                    "current_median",
+                ]
+            ].round(2),
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "projected_median": "Draft-night median",
+                "current_median": "Now (median)",
+            },
+        )
 
 elif page == "Compare":
     names = list(options)

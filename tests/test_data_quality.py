@@ -383,17 +383,18 @@ def test_grades_ordered_and_consistent_with_status(con) -> None:
 
 
 def test_grade_ranges_respect_peak_already_reached(con) -> None:
-    # A best-3-season value can't fall: the current floor is at least what he has reached.
+    # A best-3-season value can't fall: the current floor is at least what he has reached
+    # (graded peak: includes playoffs and accolade floors, D033).
     d = q(
         con,
-        """SELECT g.current_floor, o.peak3_blend
+        """SELECT g.current_floor, g.peak_so_far
            FROM modeled.grading__grades g
            JOIN modeled.outcomes__outcomes_through_n o
              ON o.bbref_id = g.bbref_id AND o.n = g.seasons
            WHERE g.seasons > 0""",
     )
     assert len(d) > 500
-    assert (d["current_floor"] >= d["peak3_blend"] - 1e-6).all()
+    assert (d["current_floor"] >= d["peak_so_far"] - 1e-6).all()
 
 
 def test_plays_like_excludes_self_and_respects_height(con) -> None:
@@ -432,3 +433,24 @@ def test_app_bundle_has_everything_the_app_reads(tmp_path) -> None:
     assert (out / "outcomes" / "params.json").exists()
     size = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
     assert size < 25e6  # the bundle is committed; keep it small
+
+
+def test_accolades_set_a_minimum_graded_peak(con) -> None:
+    from draft_dna.outcomes.tiers import graded_peak, tier_cuts
+
+    o = q(con, "SELECT * FROM modeled.outcomes__outcomes_through_n")
+    cuts = tier_cuts(get_settings())
+    p = graded_peak(o, cuts)
+    assert (p[o["all_nba_selections"] >= 1] >= cuts[4] - 1e-9).all()
+    assert (p[o["all_star_selections"] >= 1] >= cuts[3] - 1e-9).all()
+
+
+def test_every_draft_pick_is_graded_and_retrospective_only_before_as_of_history(con) -> None:
+    g = q(con, "SELECT draft_year, projection_type FROM modeled.grading__grades")
+    picks = scalar(con, "SELECT count(*) FROM modeled.core__players WHERE drafted")
+    assert len(g) == picks
+    retro = g[g["projection_type"] == "retrospective"]
+    assert (
+        retro["draft_year"].max()
+        < g.loc[g["projection_type"] != "retrospective", "draft_year"].min()
+    )

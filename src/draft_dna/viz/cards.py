@@ -27,7 +27,7 @@ from draft_dna.config import Settings
 from draft_dna.eval import metrics as M
 from draft_dna.features import shot_xy
 from draft_dna.ingest.storage import read_table
-from draft_dna.outcomes.tiers import TIERS, tier_cuts, tier_probabilities
+from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
 from draft_dna.viz.court import draw_folded_half_court
 
 SURFACE, TEXT, TEXT_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3de"
@@ -59,7 +59,9 @@ class CardData:
             comps=read_table("modeled", "projections", "comps", s),
             plays_like=read_table("modeled", "grading", "plays_like", s),
             bands=read_table("modeled", "grading", "trajectory_bands", s),
-            peaks=otn.pivot(index="bbref_id", columns="n", values="peak3_blend"),
+            peaks=otn.assign(peak=graded_peak(otn, tier_cuts(s))).pivot(
+                index="bbref_id", columns="n", values="peak"
+            ),
             cuts=tier_cuts(s),
             nba_maps=read_table("modeled", "grading", "nba_maps", s).set_index("bbref_id"),
         )
@@ -285,7 +287,12 @@ def render(d: CardData, pid: str, path: Path) -> Path:
         0.2,
         f"{int(p['draft_year'])} draft · pick #{int(p['pick_overall'])} · "
         f"{p['team_id']} · {school} · age {_fmt(f['age_at_draft'], '.1f')} · "
-        f"{_height(f['height_in'])} · {str(f['position']).capitalize()}",
+        f"{_height(f['height_in'])}"
+        + (
+            f" · {str(f['position']).capitalize()}"
+            if str(f["position"]) not in ("unknown", "nan", "None")
+            else ""
+        ),
         fontsize=12,
         color=TEXT_2,
         va="top",
@@ -323,7 +330,14 @@ def render(d: CardData, pid: str, path: Path) -> Path:
         0.01,
         0.005,
         "Projection: draft-slot history + conformal calibration, updated with NBA "
-        "play by Bayesian updating. Comps: pre-draft stats, age and size.",
+        "play by Bayesian updating. Value includes playoffs; All-Star/All-NBA set a "
+        "minimum. Comps: pre-draft stats, age and size."
+        + (
+            "\nRETROSPECTIVE projection: this class predates enough draft history, so its "
+            "range comes from how the same draft slots did in other drafts."
+            if g.get("projection_type") == "retrospective"
+            else ""
+        ),
         fontsize=8,
         color=TEXT_2,
     )

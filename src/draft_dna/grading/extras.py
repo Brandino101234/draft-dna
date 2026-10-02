@@ -33,7 +33,7 @@ MAX_HEIGHT_DIFF = 3.0
 def trajectory_bands(s: Settings) -> pd.DataFrame:
     rows = []
     for n in range(1, 9):
-        g = asof_prior_grids(s, horizon=n)
+        g = asof_prior_grids(s, horizon=n, retrospective=True)
         q = g[QCOLS].to_numpy()
         rows.append(
             pd.DataFrame(

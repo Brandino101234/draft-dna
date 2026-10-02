@@ -18,6 +18,9 @@ draft*. A season out of the league counts as zero, so comparisons at the same N 
 - playoff(N)    sum of playoff VORP / Win Shares within 1..N
 - composite(N)  0.75 * z(peak3) + 0.25 * z(total), z-scored against the training
                 classes at the same N (weights chosen in DECISIONS D016)
+- peak3_graded(N)  like peak3 of the blend, but each season also counts its playoff
+                value (playoff VORP and Win Shares on the same z scale, no shift, so no
+                playoffs = 0). Used for grades (D033); accolade floors are applied there.
 
 The primary metric is the blend (D016); all three are kept for transparency.
 """
@@ -87,6 +90,10 @@ def season_values(
     zero_blend = ((0 - z["vorp"][0]) / z["vorp"][1] + (0 - z["ws"][0]) / z["ws"][1]) / 2
     zero_factor = sign * fa.transform(scaler.transform(zero[FACTOR_INPUTS]))[0, 0]
     df["value_blend"] -= zero_blend
+    # Playoff value on the regular-season blend scale (playoff stats are counting stats,
+    # so a deep run adds more). No shift: missing the playoffs adds 0.
+    po = (df["po_vorp"].fillna(0) / z["vorp"][1] + df["po_ws"].fillna(0) / z["ws"][1]) / 2
+    df["value_playoff"] = po
     df["value_factor"] -= zero_factor
     meta = {"factor_loadings": (sign * loadings).round(3).to_dict(), "z": z}
     return df, meta
@@ -140,6 +147,11 @@ def outcomes_through_n(grid: pd.DataFrame) -> pd.DataFrame:
         out[f"peak3_{cand}"] = by[col].transform(
             lambda v: pd.Series(_rolling_peak(v.to_numpy()), index=v.index)
         )
+    playoff = g.get("value_playoff", 0.0)
+    graded = g["value_blend"] + playoff
+    out["peak3_graded"] = graded.groupby(g["bbref_id"], sort=False).transform(
+        lambda v: pd.Series(_rolling_peak(v.to_numpy()), index=v.index)
+    )
     out["minutes"] = by["mp"].cumsum()
     # Role anchors for tiers: best 3-season stretch of minutes and starts (per season).
     for src, dst in (("mp", "best3_minutes"), ("games_started", "best3_starts")):

@@ -19,7 +19,7 @@
 2. **Shot data adds nothing detectable.** Adding shot type, assisted rate and shot mix changed forecast error by −0.0001 (95% CI −0.0016 to +0.0013). Shot location and NMF shot styles didn't help either. One exploratory lead, **rim finishing**, is pre-registered for confirmation on the 2023–2026 classes. ([Phase 5](#phase-5-does-how-a-prospect-scores-predict-nba-success))
 3. **Who beats their slot?** International and pro-team picks fall short (average PIT 0.40), and no franchise detectably develops players better than slot (p = 0.92). Size, passing and FT% predict early overperformance, but for college players that edge fades by year 6. ([Phase 6](#phase-6-who-beats-their-projection-and-why))
 4. **Year-4 verdicts hold up 86% of the time**, and when they're wrong they're usually too pessimistic (upgrades outnumber downgrades 3 to 1).
-5. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.39 on draft night to 0.03 by year 7. ([Phase 7](#phase-7-grades-cards-and-the-app))
+5. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.43 on draft night to 0.03 by year 7. Grades count playoffs and accolades, so a Finals MVP isn't graded on regular-season box scores alone. ([Phase 7](#phase-7-grades-cards-and-the-app))
 
 ## Limitations
 - **Small n and few folds.** About 1,500 training picks; shot data covers about 415 players. Effects smaller than about 0.5% of forecast error can't be detected.
@@ -296,27 +296,37 @@ Each player's draft-night projection gives a range. A **PIT score** says where h
 ### Grading: from projection to career grade
 Every player starts with his draft-night range (the **prior**). Each NBA season is evidence about where his peak will land. A Bayesian update blends the two, giving more weight to observed play as seasons accumulate, and the error model is fit on history. The peak can never fall below what he has already reached.
 
+**What's graded** is the best 3-season stretch through year 8, with two additions to the Phase 2 value ([D033](DECISIONS.md)):
+- **Playoffs count.** Each season adds its playoff VORP and Win Shares on the same scale, so deep runs add value.
+- **Accolades set a minimum.** An All-Star selection guarantees at least an All-Star-tier peak; All-NBA guarantees at least All-NBA tier.
+
+The draft-night projections are refit on this same measure, so the letters stay balanced. The first version graded on regular-season box scores alone and gave Jaylen Brown, a Finals MVP, a C. He is now a B, Jamal Murray goes C→B and Jayson Tatum B→A, while busts like Anthony Bennett and Markelle Fultz stay D.
+
+**Every pick since 1996 is graded.** Classes before 2005 had too few earlier drafts in the data for an honest draft-night projection. They get a *retrospective* projection (how the same draft slots did in other drafts), labeled on the card and never used for calibration or validation. Late-1990s and early-2000s second-rounders washed out more often than later ones, so those classes get more D's (40%).
+
 | Status | Seasons | Data weight (avg) |
 |---|---|---|
 | Projection | 0 | 0% |
-| Provisional (low confidence) | 1 | 35% |
-| Provisional (medium confidence) | 2–3 | 54–67% |
+| Provisional (low confidence) | 1 | 34% |
+| Provisional (medium confidence) | 2–3 | 54–66% |
 | Year-4 Verdict | 4–7 | 79–99% |
 | Career Grade | 8+ or retired | final |
 
-**Grade:** where the current median sits in the draft-night range. **A** above the ceiling (90th percentile), **B** above the median, **C** above the floor, **D** below it. On finished careers, A/B/C/D = 10% / 37% / 29% / 25%.
+**Grade:** where the current median sits in the draft-night range. **A** above the ceiling (90th percentile), **B** above the median, **C** above the floor, **D** below it. On finished careers with an as-of projection, A/B/C/D = 9% / 37% / 29% / 25%.
 
 **Validation** on the held-out 2011–2018 classes (480 players):
-- Forecast error (CRPS) falls from 0.387 on draft night to 0.140 after 4 seasons and 0.025 after 7.
+- Forecast error (CRPS) falls from 0.427 on draft night to 0.158 after 4 seasons and 0.028 after 7.
 - Calibrated ceilings are beaten 7–10% of the time (target 10%).
-- Floors run high early: 35–38% of players finish below them in years 1–2 and 24–30% later (target 25%).
+- Floors run high early: 34–35% of players finish below them in years 1–2 and 27–32% later (target 25%).
 
 | Player | Status | Grade | Draft-night median | Now (floor – ceiling) |
 |---|---|---|---|---|
-| Victor Wembanyama | Provisional (medium) | A | 1.85 | 4.22 (3.51 – 6.03) |
-| Kon Knueppel | Provisional (low) | A | 1.76 | 3.75 (2.78 – 5.91) |
-| Cooper Flagg | Provisional (low) | B | 1.90 | 3.02 (2.16 – 4.98) |
-| Paolo Banchero | Year-4 Verdict | B | 1.85 | 2.18 (1.83 – 3.20) |
+| Victor Wembanyama | Provisional (medium) | A | 2.16 | 4.99 (4.30 – 7.18) |
+| Kon Knueppel | Provisional (low) | B | 1.90 | 4.08 (2.99 – 6.73) |
+| Cooper Flagg | Provisional (low) | B | 2.18 | 3.23 (2.28 – 5.63) |
+| Paolo Banchero | Year-4 Verdict | B | 2.16 | 2.52 (2.10 – 3.64) |
+| Jaylen Brown | Career Grade | B | 1.84 | 2.37 (final) |
+| LeBron James | Career Grade (retrospective) | A | 2.16 | 8.04 (final) |
 
 ### Prospect cards
 Each card shows the prospect's college shot map next to his top-3 comps' maps. It also shows his outcome range against the tier lines, tier probabilities, status, grade and confidence bar, and, for 2022–25 players, his path against the projected band. Samples: [Dybantsa](reports/cards/dybanaj01.png), [Peterson](reports/cards/peterda02.png), [Boozer](reports/cards/boozeca02.png), [Flagg](reports/cards/flaggco01.png), [Wembanyama](reports/cards/wembavi01.png), [Banchero](reports/cards/banchpa01.png).
