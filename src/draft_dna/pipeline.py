@@ -56,7 +56,7 @@ def transform() -> None:
 
 @app.command()
 def report() -> None:
-    """Write reports for phases 1-6 to reports/."""
+    """Write reports for phases 1-6 and the recruiting-rank analysis to reports/."""
     from draft_dna.eval import (
         coverage,
         outcomes_report,
@@ -64,6 +64,7 @@ def report() -> None:
         phase4_report,
         phase5_report,
         phase6_report,
+        recruits,
     )
 
     coverage.run()
@@ -72,6 +73,7 @@ def report() -> None:
     phase4_report.run()
     phase5_report.run()
     phase6_report.run()
+    recruits.run(get_settings())
 
 
 @app.command()

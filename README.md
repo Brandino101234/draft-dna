@@ -19,7 +19,8 @@
 2. **Shot data adds nothing detectable.** Adding shot type, assisted rate and shot mix changed forecast error by −0.0001 (95% CI −0.0016 to +0.0013). Shot location and NMF shot styles didn't help either. One exploratory lead, **rim finishing**, is pre-registered for confirmation on the 2023–2026 classes. ([Phase 5](#phase-5-does-how-a-prospect-scores-predict-nba-success))
 3. **Who beats their slot?** International and pro-team picks fall short (average PIT 0.40), and no franchise detectably develops players better than slot (p = 0.92). Size, passing and FT% predict early overperformance, but for college players that edge fades by year 6. ([Phase 6](#phase-6-who-beats-their-projection-and-why))
 4. **Year-4 verdicts hold up 86% of the time**, and when they're wrong they're usually too pessimistic (upgrades outnumber downgrades 3 to 1).
-5. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.43 on draft night to 0.03 by year 7. Grades count playoffs and accolades, so a Finals MVP isn't graded on regular-season box scores alone. ([Phase 7](#phase-7-grades-cards-and-the-app))
+5. **Teams already price in high-school recruiting rank.** Top-10 recruits go about 20 picks earlier than unranked players, then match their slot like everyone else (pre-registered test, ρ = +0.01, p = 0.82). The unranked-to-star list includes Curry, Lillard, Westbrook and Butler. ([Recruiting rank](#recruiting-rank-were-top-recruits-over--or-underrated))
+6. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.43 on draft night to 0.03 by year 7. Grades count playoffs and accolades, so a Finals MVP isn't graded on regular-season box scores alone. ([Phase 7](#phase-7-grades-cards-and-the-app))
 
 ## Limitations
 - **Small n and few folds.** About 1,500 training picks; shot data covers about 415 players. Effects smaller than about 0.5% of forecast error can't be detected.
@@ -335,11 +336,12 @@ Each card shows the prospect's college shot map next to his top-3 comps' maps. I
 NBA early-career shot maps are projected into the same six college shot styles. Each prospect gets the five nearest NBA players by style mix, within 3 inches of his height. This is a description of shot diet only: Phase 5 showed style doesn't predict success.
 
 ### The app
-`make app` opens a Streamlit app with eight pages:
+`make app` opens a Streamlit app with nine pages:
 - **Player card:** pick a draft class or type a name; card, plain-language tier and All-Star odds, comps (click one to open its card) and the whole class
 - **Redraft:** any class re-ordered by how careers turned out (2011: Kawhi, Butler, Kyrie, Isaiah Thomas from #60)
 - **Steals & busts:** biggest moves between draft slot and redraft position, by year range and round
 - **Teams:** each franchise's picks against their slots (no detectable skill, per Phase 6, so read it as history)
+- **Recruits:** did teams misjudge high-school recruiting rank? (no), plus unranked stars and top-recruit misses
 - **Compare:** two players side by side
 - **Style map:** a 2D t-SNE layout of about 1,900 college and NBA shot styles
 - **2026 tracker:** each rookie's season-value pace against his draft-night range
@@ -348,3 +350,19 @@ NBA early-career shot maps are projected into the same six college shot styles. 
 Every card has a shareable link (`?player=<id>`), and every page has its own (`?page=redraft&year=2011`).
 
 `make refresh` updates the tracker and every grade during the season.
+
+## Recruiting rank: were top recruits over- or underrated?
+
+**Question.** Given where a player was drafted, does his high-school recruiting rank (RSCI top 100) predict whether he beat or missed his draft slot? If top recruits beat their slot, teams underrated pedigree; if they missed, teams overrated it.
+
+**Method.** The plan was written and committed before any numbers were run ([D035](DECISIONS.md)):
+- 809 drafted college players (2005–2021), each with an honest draft-night projection.
+- PIT says where each career landed within the range expected for his slot (0.5 = as expected).
+- Primary test: does PIT trend with recruit rank at year 4? Year 8 and first-round-only are robustness checks.
+
+![Recruiting rank vs draft slot](reports/recruits/recruit_rank_vs_slot.png)
+
+**Finding: no.** There's no trend at year 4 (ρ = +0.01, p = 0.82) or year 8 (ρ = −0.02, p = 0.65), and no recruit group differs from its slot. The left panel shows why: teams already used recruiting rank when picking. Top-10 recruits went around #16 on average, unranked players around #35. Once that's priced in, pedigree says nothing more. This matches Phase 3, where adding recruiting rank to the model didn't beat draft position.
+
+**Limits.** RSCI only ranks the top 100, so "unranked" lumps near-misses together with complete unknowns. Results by group are in [reports/recruits/results.md](reports/recruits/results.md), and the app's Recruits page lists the biggest unranked successes and top-recruit misses.
+
