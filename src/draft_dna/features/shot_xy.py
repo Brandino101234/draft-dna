@@ -5,6 +5,11 @@ Coordinates are standardized to feet from the basket for both leagues:
   y = 1.0 (fit from data: it best separates threes from twos in every line era).
 - stats.nba.com: LOC_X / LOC_Y are tenths of feet from the basket.
 
+For style maps, distances are also rescaled so the three-point line sits at the same
+radius in every era (the NCAA line moved from 20.75 ft to 22.15 ft in 2019-20; the NBA
+line is 23.75 ft). Without this, pooled seasons smear the arc into two bands and "threes
+from the old line" masquerade as a midrange style. Zones always use true distances.
+
 The court is folded left/right (|dx|): which side a player favors is mostly noise at
 these sample sizes, and folding halves the number of cells to estimate.
 
@@ -30,6 +35,7 @@ BANDWIDTH_FT = 1.5
 MIN_XY_FGA = 100  # eligibility for spatial features (audit, D025)
 MIN_XY_COVERAGE = 0.4
 INCONSISTENT_FT = 2.0
+REFERENCE_LINE_FT = 22.146  # current NCAA line; style maps are drawn on this scale
 CORNER_DY_FT = 8.0
 CORNER_DX_FT = 20.0
 
@@ -68,6 +74,9 @@ def _consistency_filter(df: pd.DataFrame, corner_line_ft: float | None = None) -
     out["dist_ft"] = dist
     out.loc[bad, ["dx", "dy", "dist_ft"]] = np.nan
     out["xy_valid"] = out["dx"].notna()
+    scale = REFERENCE_LINE_FT / out["line_ft"]
+    out["sx"] = out["dx"] * scale  # era-normalized coordinates for style maps
+    out["sy"] = out["dy"] * scale
     return out
 
 
@@ -102,7 +111,7 @@ def player_maps(shots: pd.DataFrame, key: str = "bbref_id") -> pd.DataFrame:
     valid = shots[shots["xy_valid"]]
     rows = {}
     for pid, g in valid.groupby(key):
-        rows[pid] = density_map(g["dx"].to_numpy(), g["dy"].to_numpy())
+        rows[pid] = density_map(g["sx"].to_numpy(), g["sy"].to_numpy())
     maps = pd.DataFrame.from_dict(rows, orient="index")
     maps.columns = [f"c{i}" for i in range(maps.shape[1])]
     maps["xy_fga"] = valid.groupby(key).size()
