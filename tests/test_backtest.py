@@ -82,7 +82,7 @@ def test_backtest_outputs_monotone_quantiles_for_every_test_player() -> None:
 
 
 def test_tier_probabilities_sum_to_one_and_follow_cdf() -> None:
-    from draft_dna.models.projections import tier_probabilities
+    from draft_dna.outcomes.tiers import tier_probabilities
 
     q = np.vstack([norm.ppf(M.QS, loc=1.0, scale=0.8), np.linspace(0, 3, len(M.QS))])
     cuts = [0.01, 0.32, 1.01, 1.76, 2.37]

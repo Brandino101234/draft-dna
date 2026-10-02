@@ -100,12 +100,14 @@ def project() -> None:
 def grade() -> None:
     """Phase 7: grade every player and build trajectory bands, plays-like comps, style map."""
     from draft_dna import db
-    from draft_dna.grading import extras
+    from draft_dna.grading import extras, tracker
     from draft_dna.grading import run as grading
+    from draft_dna.ingest.storage import write_table
 
     s = get_settings()
     grading.run(s)
     extras.run(s)
+    write_table(tracker.rookie_tracker(s), "modeled", "grading", "rookie_tracker", s)
     db.load(s)
 
 
@@ -132,6 +134,14 @@ def cards(all_recent: bool = True) -> None:
 
 
 @app.command()
+def bundle() -> None:
+    """Export the small tables the deployed app reads into app/bundle/."""
+    from draft_dna import app_bundle
+
+    app_bundle.export(get_settings())
+
+
+@app.command()
 def build() -> None:
     """Ingest every source (cached pages are reused) and run all transforms."""
     from draft_dna.build import build_all
@@ -144,19 +154,23 @@ def refresh(skip_ingest: bool = False) -> None:
     """In-season update: re-pull current-season pages, rebuild tables, regrade, redraw cards.
 
     Only pages for the season in progress are re-fetched (older pages are cached forever),
-    so this makes a handful of requests. Draft-night projections never change.
+    so this makes a handful of requests. Draft-night projections never change. Ends by
+    re-exporting app/bundle; commit and push it to update the public app.
     """
     from draft_dna.build import transform as run_transform
-    from draft_dna.grading import tracker
 
     if not skip_ingest:
         log.info("== ingest bbref-league (current season only re-fetched)")
         STEPS["bbref-league"]()
+    from draft_dna import app_bundle
+    from draft_dna.ingest.storage import read_table
+
     run_transform()
     grade()
     cards()
     s = get_settings()
-    t = tracker.rookie_tracker(s)
+    app_bundle.export(s)
+    t = read_table("modeled", "grading", "rookie_tracker", s)
     counts = t["status"].value_counts().to_dict()
     log.info("%d class tracker: %s", s.draft_classes.live[-1], counts)
     movers = t[t["status"].str.startswith("pacing")].head(10)

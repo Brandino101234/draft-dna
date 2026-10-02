@@ -19,7 +19,7 @@ from draft_dna.eval import backtest as bt
 from draft_dna.eval import phase3 as P
 from draft_dna.ingest.storage import read_table
 from draft_dna.logging_utils import get_logger
-from draft_dna.outcomes.tiers import TIERS
+from draft_dna.outcomes.tiers import TIERS, tier_cuts
 
 log = get_logger(__name__)
 
@@ -244,7 +244,7 @@ def run(s: Settings | None = None) -> None:
     plot_calibration(preds, out / "calibration.png")
     proj = read_table("modeled", "projections", "projections", s)
     comps = read_table("modeled", "projections", "comps", s)
-    cuts = P.tier_cuts(s)
+    cuts = tier_cuts(s)
     plot_class_bands(proj, cuts, 2026, out / "draft_2026_bands.png")
     players = P.players(s)
 

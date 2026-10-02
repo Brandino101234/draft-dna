@@ -25,13 +25,9 @@ from matplotlib.patches import Rectangle
 
 from draft_dna.config import Settings
 from draft_dna.eval import metrics as M
-from draft_dna.eval.phase3 import tier_cuts
 from draft_dna.features import shot_xy
-from draft_dna.grading.extras import nba_maps
-from draft_dna.grading.run import QCOLS
 from draft_dna.ingest.storage import read_table
-from draft_dna.models.projections import tier_probabilities
-from draft_dna.outcomes.tiers import TIERS
+from draft_dna.outcomes.tiers import TIERS, tier_cuts, tier_probabilities
 from draft_dna.viz.court import draw_folded_half_court
 
 SURFACE, TEXT, TEXT_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3de"
@@ -65,7 +61,7 @@ class CardData:
             bands=read_table("modeled", "grading", "trajectory_bands", s),
             peaks=otn.pivot(index="bbref_id", columns="n", values="peak3_blend"),
             cuts=tier_cuts(s),
-            nba_maps=nba_maps(s),
+            nba_maps=read_table("modeled", "grading", "nba_maps", s).set_index("bbref_id"),
         )
 
 
@@ -117,17 +113,39 @@ def _card_comps(d: CardData, pid: str, k: int = 3) -> pd.DataFrame:
 
 def _range(ax: Axes, d: CardData, pid: str) -> None:
     g = d.grades.loc[pid]
-    q = g[[f"post_{c}" for c in QCOLS]].to_numpy(dtype=float)[None, :]
+    q = g[[f"post_{c}" for c in M.QCOLS]].to_numpy(dtype=float)[None, :]
     floor, med, ceil = q[0, M.qidx(M.FLOOR)], q[0, M.qidx(M.MEDIAN)], q[0, M.qidx(M.CEILING)]
-    top = max(ceil * 1.15, d.cuts[-1] + 0.8)
+    top = max(ceil, g["projected_ceiling"]) * 1.15
+    top = max(top, d.cuts[-1] + 0.8)
     for c, label in zip(d.cuts[1:], TIERS[2:], strict=True):
         ax.axvline(c, color=GRID, linewidth=1, zorder=0)
         ax.text(c + 0.03, 1.32, label, fontsize=7.5, color=TEXT_2)
-    ax.hlines(0.6, floor, ceil, color=BLUE, linewidth=9, alpha=0.35)
-    ax.scatter([med], [0.6], s=90, color=BLUE, edgecolor=SURFACE, linewidth=2, zorder=3)
-    ax.text(floor, 0.15, f"floor {floor:.1f}", fontsize=8, color=TEXT_2, ha="center")
-    ax.text(med, 0.95, f"median {med:.1f}", fontsize=9, color=TEXT, ha="center")
-    ax.text(ceil, 0.15, f"ceiling {ceil:.1f}", fontsize=8, color=TEXT_2, ha="center")
+    if ceil - floor < 0.05:  # finished career: the outcome is known
+        p_floor, p_ceil = g["projected_floor"], g["projected_ceiling"]
+        ax.hlines(0.6, p_floor, p_ceil, color=GRID, linewidth=9)
+        ax.text(
+            (p_floor + p_ceil) / 2,
+            0.15,
+            f"draft-night range {p_floor:.1f}-{p_ceil:.1f}",
+            fontsize=8,
+            color=TEXT_2,
+            ha="center",
+        )
+        ax.scatter([med], [0.6], s=90, color=BLUE, edgecolor=SURFACE, linewidth=2, zorder=3)
+        ax.text(
+            med,
+            0.95,
+            f"actual {med:.1f}",
+            fontsize=9,
+            color=TEXT,
+            ha="left" if med < 0.1 * top else "center",
+        )
+    else:
+        ax.hlines(0.6, floor, ceil, color=BLUE, linewidth=9, alpha=0.35)
+        ax.scatter([med], [0.6], s=90, color=BLUE, edgecolor=SURFACE, linewidth=2, zorder=3)
+        ax.text(floor, 0.15, f"floor {floor:.1f}", fontsize=8, color=TEXT_2, ha="center")
+        ax.text(med, 0.95, f"median {med:.1f}", fontsize=9, color=TEXT, ha="center")
+        ax.text(ceil, 0.15, f"ceiling {ceil:.1f}", fontsize=8, color=TEXT_2, ha="center")
     ax.set_xlim(0, top)
     ax.set_ylim(0, 1.5)
     ax.set_yticks([])
@@ -144,7 +162,7 @@ def _range(ax: Axes, d: CardData, pid: str) -> None:
 
 def _tiers(ax: Axes, d: CardData, pid: str) -> None:
     g = d.grades.loc[pid]
-    q = g[[f"post_{c}" for c in QCOLS]].to_numpy(dtype=float)[None, :]
+    q = g[[f"post_{c}" for c in M.QCOLS]].to_numpy(dtype=float)[None, :]
     p = tier_probabilities(q, d.cuts)[0]
     y = np.arange(len(TIERS))[::-1]
     ax.barh(y, p, color=BLUE, height=0.6)

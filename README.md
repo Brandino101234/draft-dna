@@ -42,7 +42,9 @@ make refresh    # in-season: re-pull current-season pages, regrade, redraw cards
 make dq         # data-quality tests against the built database
 ```
 
-All raw data is rebuilt from scripts; nothing under `data/` is committed. Every methodological choice is in [DECISIONS.md](DECISIONS.md); status is in [ROADMAP.md](ROADMAP.md).
+All raw data is rebuilt from scripts; nothing under `data/` is committed.
+
+**Public app.** The deployed app (Streamlit Community Cloud) has no database. It reads `app/bundle/`, about 11 MB of modeled tables exported by `make bundle`, with no raw source data, and draws cards on demand. It installs only the slim `app/requirements.txt`. During the season, run `make refresh` (which re-exports the bundle), then commit and push `app/bundle/`; the live app redeploys automatically. Every methodological choice is in [DECISIONS.md](DECISIONS.md); status is in [ROADMAP.md](ROADMAP.md).
 
 ---
 

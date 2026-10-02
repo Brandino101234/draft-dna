@@ -21,7 +21,7 @@ from draft_dna.logging_utils import get_logger
 log = get_logger(__name__)
 
 FIRST_GRADED_CLASS = 2005  # needs >= 100 classes' worth of year-8 history before it
-QCOLS = [f"q{t:.2f}" for t in M.QS]
+QCOLS = M.QCOLS
 
 
 def peaks_wide(s: Settings) -> pd.DataFrame:

@@ -135,6 +135,7 @@ def run(s: Settings) -> None:
     write_table(pl, "modeled", "grading", "plays_like", s)
     write_table(college_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_college", s)
     write_table(nba_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_nba", s)
+    write_table(nba_maps(s).reset_index(names="bbref_id"), "modeled", "grading", "nba_maps", s)
     sm = style_map(college_w, nba_w, labels)
     sm["player_name"] = sm["bbref_id"].map(players["player_name"])
     write_table(sm, "modeled", "grading", "style_map", s)

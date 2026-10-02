@@ -261,3 +261,16 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 **Plays-like comps:** NBA early-career shot maps (≥ 200 FGA) are projected onto the college NMF styles, with the 3-point line rescaled. Matches use cosine similarity and must be within 3 inches of height. They are **stylistic only**: Phase 5 found style has no predictive value. The "Rim attacker" style dominates the style map, so coarse labels hide a lot of variety.
 
 **Rookie tracker / refresh:** a rookie's projected range is 3 × the year-1 peak band. Pace = value-to-date × 82 / team games played. `draft-dna refresh` re-fetches only current-season pages (older pages are cached), then rebuilds, regrades and redraws cards. Draft-night projections never change.
+
+### D032: Public app deployment
+
+**Hosting:** Streamlit Community Cloud (free, deploys from GitHub, redeploys on push).
+
+**Data:** the cloud has no database or raw data, and the rebuild takes hours of rate-limited scraping, so the app reads a committed bundle (`app/bundle/`, ~11 MB):
+- **Contents:** modeled outputs only. Grades, comps, plays-like, style map, trajectory bands, rookie tracker and the shot-map grids (float32) needed to draw cards. Player and feature tables are cut to the columns cards display.
+- **What stays out:** raw source tables, which respects Sports-Reference's objection to bulk redistribution.
+- **Why committing it is acceptable:** this is a deliberate exception to the "never commit data" rule (CLAUDE.md). The bundle is small, rebuilt from scripts by `make bundle`, and the static maps are stored once in git history. In-season refreshes change about 1 MB.
+
+**Cards** are rendered on demand in the cloud (about 0.2 s each) instead of committing 39 MB of PNGs that would be re-committed on every refresh.
+
+**Dependencies:** the app installs only `app/requirements.txt` (no LightGBM, PyMC or scraping stack). The few helpers cards need moved into lightweight modules (`outcomes.tiers.tier_cuts`, `tier_probabilities`, `eval.metrics.QCOLS`).

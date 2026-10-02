@@ -1,0 +1,27 @@
+{
+  "primary_metric": "blend",
+  "peak_weight": 0.75,
+  "tier_names": [
+    "Out of league",
+    "Bust",
+    "Rotation",
+    "Starter",
+    "All-Star",
+    "All-NBA"
+  ],
+  "tier_cuts_peak3": [
+    0.01,
+    0.32,
+    1.01,
+    1.76,
+    2.37
+  ],
+  "tier_anchor_agreement": 0.669,
+  "factor_loadings": {
+    "vorp": 0.985,
+    "ws": 0.929,
+    "mp": 0.681,
+    "bpm_shrunk": 0.964,
+    "start_share": 0.596
+  }
+}

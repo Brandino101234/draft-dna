@@ -16,8 +16,14 @@ balanced accuracy), so the tiers mean "plays like a typical X", not "was voted X
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
+
+from draft_dna.config import Settings
+from draft_dna.eval import metrics as M
+from draft_dna.ingest.storage import table_path
 
 TIERS = ["Out of league", "Bust", "Rotation", "Starter", "All-Star", "All-NBA"]
 
@@ -60,3 +66,16 @@ def calibrate(peak: pd.Series, anchor: pd.Series) -> list[float]:
 def assign(peak: pd.Series | np.ndarray, cuts: list[float]) -> np.ndarray:
     """Tier index for each peak value."""
     return np.searchsorted(np.asarray(cuts), np.asarray(peak, dtype=float), side="right")
+
+
+def tier_cuts(s: Settings) -> list[float]:
+    """Tier cutoffs on peak3_blend, as fit in Phase 2 (outcomes/params.json)."""
+    path = table_path("modeled", "outcomes", "params", s).with_suffix(".json")
+    return list(json.loads(path.read_text())["tier_cuts_peak3"])
+
+
+def tier_probabilities(q: np.ndarray, cuts: list[float]) -> np.ndarray:
+    """P(tier) for each row from the quantile grid: differences of the CDF at cutoffs."""
+    cdf = np.column_stack([M.cdf_at(q, c) for c in cuts])
+    edges = np.column_stack([np.zeros(len(q)), cdf, np.ones(len(q))])
+    return np.clip(np.diff(edges, axis=1), 0, 1)
