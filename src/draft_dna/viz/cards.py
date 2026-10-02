@@ -113,6 +113,10 @@ def _card_comps(d: CardData, pid: str, k: int = 3) -> pd.DataFrame:
     return (with_map if len(with_map) >= k else c).head(k)
 
 
+def _tier_of(d: CardData, value: float) -> str:
+    return TIERS[int(np.searchsorted(d.cuts, value, side="right"))]
+
+
 def _range(ax: Axes, d: CardData, pid: str) -> None:
     g = d.grades.loc[pid]
     q = g[[f"post_{c}" for c in M.QCOLS]].to_numpy(dtype=float)[None, :]
@@ -137,7 +141,7 @@ def _range(ax: Axes, d: CardData, pid: str) -> None:
         ax.text(
             med,
             0.95,
-            f"actual {med:.1f}",
+            f"actual {med:.1f} · {_tier_of(d, med)}",
             fontsize=9,
             color=TEXT,
             ha="left" if med < 0.1 * top else "center",
@@ -146,7 +150,9 @@ def _range(ax: Axes, d: CardData, pid: str) -> None:
         ax.hlines(0.6, floor, ceil, color=BLUE, linewidth=9, alpha=0.35)
         ax.scatter([med], [0.6], s=90, color=BLUE, edgecolor=SURFACE, linewidth=2, zorder=3)
         ax.text(floor, 0.15, f"floor {floor:.1f}", fontsize=8, color=TEXT_2, ha="center")
-        ax.text(med, 0.95, f"median {med:.1f}", fontsize=9, color=TEXT, ha="center")
+        ax.text(
+            med, 0.95, f"median {med:.1f} · {_tier_of(d, med)}", fontsize=9, color=TEXT, ha="center"
+        )
         ax.text(ceil, 0.15, f"ceiling {ceil:.1f}", fontsize=8, color=TEXT_2, ha="center")
     ax.set_xlim(0, top)
     ax.set_ylim(0, 1.5)
@@ -307,6 +313,18 @@ def render(d: CardData, pid: str, path: Path) -> Path:
     else:
         _shot_map(main, d, pid, "College shot map", big=True)
     comps = _card_comps(d, pid)
+    # High-school and pro-team prospects have few pre-draft stats: their comps rest mostly
+    # on age, size and position, so the similarity score overstates how alike they are.
+    limited = str(g.get("prospect_source")) in ("high_school", "other_team")
+    if limited and len(comps):
+        fig.text(
+            0.125,
+            0.555,
+            "Comps: limited pre-draft data (age, size, position only)",
+            fontsize=8.5,
+            color=TEXT_2,
+            style="italic",
+        )
     for i, c in enumerate(comps.itertuples()):
         ax = fig.add_subplot(gs[2 + i // 2, i % 2]) if i < 2 else fig.add_subplot(gs[3, 0])
         use_nba = c.comp_id not in d.maps.index and c.comp_id in d.nba_maps.index
@@ -317,7 +335,11 @@ def render(d: CardData, pid: str, path: Path) -> Path:
             nba=use_nba,
             title=f"{c.comp_name} ('{c.comp_draft_year % 100:02d})"
             f"{' · NBA map' if use_nba else ''}\n"
-            f"sim {c.similarity:.0f} · yr-6 peak {c.comp_peak6:.1f}",
+            + (
+                f"yr-6 peak {c.comp_peak6:.1f}"
+                if limited
+                else f"sim {c.similarity:.0f} · yr-6 peak {c.comp_peak6:.1f}"
+            ),
         )
     _range(fig.add_subplot(gs[1, 2:6]), d, pid)
     _tiers(fig.add_subplot(gs[2:4, 2:4]), d, pid)

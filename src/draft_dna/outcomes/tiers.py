@@ -82,10 +82,20 @@ def tier_probabilities(q: np.ndarray, cuts: list[float]) -> np.ndarray:
 
 
 def graded_peak(otn: pd.DataFrame, cuts: list[float]) -> pd.Series:
-    """Best 3-season value incl. playoffs, floored by accolades earned through N."""
+    """Best 3-season value incl. playoffs, floored by accolades earned through N (D033):
+    All-NBA -> All-NBA tier; All-Star or DPOY -> All-Star tier; All-Defense -> Starter."""
+
+    def has(col: str) -> np.ndarray:
+        return (otn[col] >= 1).to_numpy() if col in otn else np.zeros(len(otn), bool)
+
     floor = np.select(
-        [otn["all_nba_selections"] >= 1, otn["all_star_selections"] >= 1],
-        [cuts[4], cuts[3]],  # All-NBA and All-Star tier cutoffs
+        [
+            has("all_nba_selections"),
+            has("all_star_selections") | has("dpoy_awards"),
+            has("all_defense_selections"),
+        ],
+        # just above the cutoff, so the floored peak falls inside that tier
+        [cuts[4] + 1e-6, cuts[3] + 1e-6, cuts[2] + 1e-6],
         -np.inf,
     )
     return pd.Series(np.maximum(otn["peak3_graded"].to_numpy(dtype=float), floor), otn.index)

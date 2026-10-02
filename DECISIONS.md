@@ -292,3 +292,21 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Caveat:** they skew to D (40%) because early-era second-rounders washed out more often than the later drafts the model learned from.
 
 **Known limit:** high-school and international prospects have few pre-draft stats, so their *comps* rest mostly on age, size and pick. Comps for LeBron show similarity 100 with Kwame Brown and Tyson Chandler, which is technically matched but not informative.
+
+### D034: Defensive awards in grades; early-floor drift correction; plain-language summaries
+
+**Defensive awards** extend the D033 accolade floors:
+- **DPOY** guarantees at least an All-Star-tier peak.
+- **An All-Defensive team** guarantees at least a Starter-tier peak.
+- **Effects:** Marcus Smart B, and Tony Allen, Avery Bradley, Andre Roberson and Thybulle B. The letter mix is unchanged.
+- **Boundary rule:** floors sit 1e-6 above the tier cutoff, so a floored peak lands inside that tier. Without it, Ingram showed "All-Star tier, 5% All-Star".
+
+**Early floors ran high because of drift, not method.** Fit on classes ≤ 2010, the year-1 floor was missed exactly 25% of the time in-sample, but 36% on 2011–18 classes. Recent players improve less after year 1: a gain of more than 0.3 from year 2 to year 8 happened for 41% of 1996–2010 picks but 31% of 2015+ picks.
+- **Tried and rejected:** fitting calibration or the measurement model on only recent classes changed nothing.
+- **Fix:** shrink the lower tail (≤ 25th percentile) toward the peak already reached: q = r + λ(q − r), with λ = 0.7 for years 1–2 and 0.85 for year 3.
+- **Tuning:** λ was tuned on 2011–14 classes. On untouched 2015–17 classes, below-floor fell from 35% / 34% / 30% to 28% / 28% / 26% for years 1–3, with CRPS unchanged.
+- **Consistency:** validation now applies the same reached/shrink rules as production.
+
+**Plain-language summaries:** grades carry the tier of the median and P(All-Star or better), both now and on draft night, computed from the same quantile grids. The app leads with these instead of raw peak values.
+
+**Comps for limited-data prospects:** high-school and pro-team prospects (`prospect_source`) have comps based mostly on age, size and position. The app and cards say so and hide the similarity score, which overstates the match (LeBron–Kwame Brown at 100).

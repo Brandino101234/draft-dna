@@ -110,10 +110,14 @@ def season_grid(players: pd.DataFrame, seasons: pd.DataFrame, last_season: int) 
     rows["season"] = (rows["base_year"] + rows["season_num"]).astype(int)
     value_cols = [c for c in seasons.columns if c.startswith("value_")] + [
         "mp", "games", "games_started", "vorp", "ws", "po_vorp", "po_ws", "po_mp", "all_star",
-        "all_nba_team",
+        "all_nba_team", "all_defense_team", "won_dpoy",
         "mvp_share", "season_num",
     ]  # fmt: skip
-    s = seasons[["bbref_id", "season", *[c for c in value_cols if c != "season_num"]]]
+    s = seasons.copy()
+    for col in ("all_defense_team", "won_dpoy"):  # optional award columns
+        if col not in s:
+            s[col] = pd.NA
+    s = s[["bbref_id", "season", *[c for c in value_cols if c != "season_num"]]]
     grid = rows.merge(s, on=["bbref_id", "season"], how="left")
     grid["in_nba"] = grid["mp"].notna()
     counts = ["mp", "games", "games_started", "vorp", "ws", "po_vorp", "po_ws", "po_mp"]
@@ -121,8 +125,10 @@ def season_grid(players: pd.DataFrame, seasons: pd.DataFrame, last_season: int) 
     grid[num] = grid[num].fillna(0.0)
     grid["all_star"] = grid["all_star"].astype("boolean").fillna(False).astype(bool)
     grid["all_nba"] = grid["all_nba_team"].notna()
+    grid["all_defense"] = grid["all_defense_team"].notna()
+    grid["dpoy"] = grid["won_dpoy"].astype("boolean").fillna(False).astype(bool)
     grid["mvp_share"] = grid["mvp_share"].fillna(0.0)
-    return grid.drop(columns=["all_nba_team"])
+    return grid.drop(columns=["all_nba_team", "all_defense_team", "won_dpoy"])
 
 
 def _rolling_peak(values: np.ndarray, window: int = 3) -> np.ndarray:
@@ -165,6 +171,8 @@ def outcomes_through_n(grid: pd.DataFrame) -> pd.DataFrame:
     out["playoff_minutes"] = by["po_mp"].cumsum()
     out["all_star_selections"] = by["all_star"].cumsum()
     out["all_nba_selections"] = by["all_nba"].cumsum()
+    out["all_defense_selections"] = by["all_defense"].cumsum()
+    out["dpoy_awards"] = by["dpoy"].cumsum()
     out["mvp_shares"] = by["mvp_share"].cumsum()
     return out.reset_index(drop=True)
 

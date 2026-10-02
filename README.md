@@ -26,7 +26,7 @@
 - **Shot coordinates** exist only from 2014, and mostly for televised high-major games.
 - **No international, G League or injury histories.** "Missed games" mixes injury, demotion and coach's decisions.
 - **Situation effects are associations**, not causal estimates (E-values reported).
-- **Early grade floors are optimistic.** 35–38% of players finish below the year-1/2 floor (target 25%).
+- **Recent players develop less after year 1 than older ones did.** Early floors are pulled toward the peak already reached to compensate ([D034](DECISIONS.md)); on untouched 2015–17 classes about 28% still finish below the year-1/2 floor (target 25%).
 - **"Plays like" comps are stylistic only** and say nothing about how good a player will be.
 
 ## Quickstart
@@ -298,7 +298,7 @@ Every player starts with his draft-night range (the **prior**). Each NBA season 
 
 **What's graded** is the best 3-season stretch through year 8, with two additions to the Phase 2 value ([D033](DECISIONS.md)):
 - **Playoffs count.** Each season adds its playoff VORP and Win Shares on the same scale, so deep runs add value.
-- **Accolades set a minimum.** An All-Star selection guarantees at least an All-Star-tier peak; All-NBA guarantees at least All-NBA tier.
+- **Accolades set a minimum.** All-NBA guarantees at least an All-NBA-tier peak; an All-Star selection or Defensive Player of the Year at least All-Star tier; an All-Defensive team at least Starter tier.
 
 The draft-night projections are refit on this same measure, so the letters stay balanced. The first version graded on regular-season box scores alone and gave Jaylen Brown, a Finals MVP, a C. He is now a B, Jamal Murray goes C→B and Jayson Tatum B→A, while busts like Anthony Bennett and Markelle Fultz stay D.
 
@@ -315,9 +315,9 @@ The draft-night projections are refit on this same measure, so the letters stay 
 **Grade:** where the current median sits in the draft-night range. **A** above the ceiling (90th percentile), **B** above the median, **C** above the floor, **D** below it. On finished careers with an as-of projection, A/B/C/D = 9% / 37% / 29% / 25%.
 
 **Validation** on the held-out 2011–2018 classes (480 players):
-- Forecast error (CRPS) falls from 0.427 on draft night to 0.158 after 4 seasons and 0.028 after 7.
+- Forecast error (CRPS) falls from 0.428 on draft night to 0.155 after 4 seasons and 0.028 after 7.
 - Calibrated ceilings are beaten 7–10% of the time (target 10%).
-- Floors run high early: 34–35% of players finish below them in years 1–2 and 27–32% later (target 25%).
+- Floors: 24–26% of players finish below them in years 1–3 and 28–31% later (target 25%). Recent classes develop less after year 1 than the history the model learns from, so early floors are pulled toward the peak already reached; the factor was tuned on 2011–14 classes, and on the untouched 2015–17 classes the year-1/2 miss rate is 28% (was 35%).
 
 | Player | Status | Grade | Draft-night median | Now (floor – ceiling) |
 |---|---|---|---|---|
@@ -335,11 +335,16 @@ Each card shows the prospect's college shot map next to his top-3 comps' maps. I
 NBA early-career shot maps are projected into the same six college shot styles. Each prospect gets the five nearest NBA players by style mix, within 3 inches of his height. This is a description of shot diet only: Phase 5 showed style doesn't predict success.
 
 ### The app
-`make app` opens a Streamlit app with five pages:
-- **Player card:** search any graded player, with comps and plays-like tables
+`make app` opens a Streamlit app with eight pages:
+- **Player card:** pick a draft class or type a name; card, plain-language tier and All-Star odds, comps (click one to open its card) and the whole class
+- **Redraft:** any class re-ordered by how careers turned out (2011: Kawhi, Butler, Kyrie, Isaiah Thomas from #60)
+- **Steals & busts:** biggest moves between draft slot and redraft position, by year range and round
+- **Teams:** each franchise's picks against their slots (no detectable skill, per Phase 6, so read it as history)
 - **Compare:** two players side by side
 - **Style map:** a 2D t-SNE layout of about 1,900 college and NBA shot styles
 - **2026 tracker:** each rookie's season-value pace against his draft-night range
 - **About:** this writeup
+
+Every card has a shareable link (`?player=<id>`), and every page has its own (`?page=redraft&year=2011`).
 
 `make refresh` updates the tracker and every grade during the season.

@@ -22,10 +22,11 @@ from draft_dna.config import Settings
 from draft_dna.eval import backtest as bt
 from draft_dna.eval import metrics as M
 from draft_dna.eval.phase3 import pick_conformal
+from draft_dna.eval.phase6 import FRANCHISE
 from draft_dna.grading import bayes as B
 from draft_dna.ingest.storage import read_table, write_table
 from draft_dna.logging_utils import get_logger
-from draft_dna.outcomes.tiers import graded_peak, tier_cuts
+from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
 
 log = get_logger(__name__)
 
@@ -102,6 +103,9 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     out["player_name"] = out.index.map(players["player_name"])
     out["draft_year"] = out.index.map(players["draft_year"]).astype(int)
     out["pick"] = out.index.map(players["pick_overall"])
+    out["team"] = out.index.map(players["team_id"])
+    out["franchise"] = out["team"].replace(FRANCHISE)
+    out["prospect_source"] = out.index.map(players["prospect_source"])
     out["projection_type"] = np.where(
         priors["retrospective"].astype(bool), "retrospective", "as of draft night"
     )
@@ -128,13 +132,15 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     mean[final], sd[final], weight[final] = B.s(obs_final[final]), 0.0, 1.0
     pq = grid.copy()  # 0 seasons: the (already conformal-calibrated) draft-night range
     seasons = out["seasons"].to_numpy()
+    # Peak value through year 8 can never be below the peak already reached.
+    reached = np.nan_to_num(out["peak_so_far"].to_numpy(dtype=float), nan=0.0)
     for n in range(1, B.FINAL_N):
         rows = (seasons == n) & ~final
         if rows.any():
-            pq[rows] = zcal[n].quantiles(B.Posterior(mean[rows], sd[rows], weight[rows]))
+            q = zcal[n].quantiles(B.Posterior(mean[rows], sd[rows], weight[rows]))
+            q = np.maximum(q, reached[rows, None])
+            pq[rows] = B.shrink_floor(q, reached[rows], n)
     pq[final] = (B.s(obs_final[final]) ** 2)[:, None]
-    # Peak value through year 8 can never be below the peak already reached.
-    reached = np.nan_to_num(out["peak_so_far"].to_numpy(dtype=float), nan=0.0)
     pq = np.maximum(pq, reached[:, None])
 
     out["projected_floor"] = grid[:, M.qidx(M.FLOOR)]
@@ -144,6 +150,13 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     out["current_median"] = pq[:, M.qidx(M.MEDIAN)]
     out["current_ceiling"] = pq[:, M.qidx(M.CEILING)]
     out["data_weight"] = weight
+    # Plain-language summaries: the tier the median falls in, and P(All-Star or better).
+    cuts = tier_cuts(s)
+    star = TIERS.index("All-Star")
+    for kind, q in (("projected", grid), ("current", pq)):
+        med = q[:, M.qidx(M.MEDIAN)]
+        out[f"{kind}_tier"] = [TIERS[i] for i in np.searchsorted(cuts, med, side="right")]
+        out[f"{kind}_p_all_star"] = tier_probabilities(q, cuts)[:, star:].sum(axis=1)
     out["confidence"] = 1 - np.clip(sd / s0, 0, 1)
     out["grade"] = B.grade_letter(out["current_median"].to_numpy(), grid)
     out.loc[out["seasons"] == 0, "grade"] = "-"  # no NBA games yet: projection only
@@ -178,7 +191,12 @@ def validate(s: Settings, fit_max_class: int = 2010) -> pd.DataFrame:
         obs = drafted.loc[test.index, n].to_numpy() if n else y
         post = B.update(m0, s0, obs, meas.get(n))
         variants = [("normal", post.quantiles())]
-        variants.append(("calibrated", grid if n == 0 else zcal[n].quantiles(post)))
+        if n == 0:
+            cal = grid
+        else:
+            cal = np.maximum(zcal[n].quantiles(post), obs[:, None])
+            cal = B.shrink_floor(cal, obs, n)
+        variants.append(("calibrated", cal))
         for label, q in variants:
             rows.append(
                 {

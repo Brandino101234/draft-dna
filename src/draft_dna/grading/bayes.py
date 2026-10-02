@@ -144,3 +144,21 @@ def fit_calibration(post: Posterior, final: np.ndarray, levels: np.ndarray = QS)
     resid = s(final) - post.mean
     rq = np.vstack([np.quantile(resid[b == k], levels) for k in range(N_BINS)])
     return Calibration(edges, rq)
+
+
+# Recent classes develop less after their first seasons than the history the calibration
+# is fit on, so early floors ran high on held-out classes (35% below the 25th percentile).
+# Pull the lower tail (<= 25th percentile) toward the peak already reached; factors tuned
+# on 2011-14 classes and checked on 2015-17 (D034).
+FLOOR_SHRINK = {1: 0.7, 2: 0.7, 3: 0.85}
+
+
+def shrink_floor(q: np.ndarray, reached: np.ndarray, n: int) -> np.ndarray:
+    lam = FLOOR_SHRINK.get(n)
+    if lam is None:
+        return q
+    out = q.copy()
+    low = QS <= 0.25
+    r = reached[:, None]
+    out[:, low] = r + lam * (q[:, low] - r)
+    return out
