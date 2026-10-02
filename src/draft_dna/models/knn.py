@@ -20,6 +20,8 @@ distance uses only the features both players have, rescaled for the missing ones
 
 from __future__ import annotations
 
+from typing import Self
+
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -32,12 +34,13 @@ from draft_dna.features.predraft import STATS_FEATURES
 
 class _Standardizer:
     def fit(self, x: pd.DataFrame) -> _Standardizer:
+        x = x.astype(float)
         self.mu = x.mean()
         self.sd = x.std().replace(0, 1.0).fillna(1.0)
         return self
 
     def transform(self, x: pd.DataFrame) -> np.ndarray:
-        return ((x - self.mu) / self.sd).to_numpy(dtype=float)
+        return ((x.astype(float) - self.mu) / self.sd).to_numpy(dtype=float)
 
 
 class _NeighborModel:
@@ -55,7 +58,7 @@ class _NeighborModel:
     def _distances(self, test: pd.DataFrame) -> np.ndarray:
         raise NotImplementedError
 
-    def fit(self, train: pd.DataFrame, y: np.ndarray) -> _NeighborModel:
+    def fit(self, train: pd.DataFrame, y: np.ndarray) -> Self:
         self.train_ids = train["bbref_id"].to_numpy()
         self.y = np.asarray(y, dtype=float)
         self._fit_space(train, self.y)
@@ -67,7 +70,8 @@ class _NeighborModel:
         d = np.where(np.isnan(d), np.inf, d)
         k = min(k or self.k, d.shape[1])
         idx = np.argsort(d, axis=1, kind="stable")[:, :k]
-        return idx, np.take_along_axis(d, idx, axis=1)
+        dist = np.take_along_axis(d, idx, axis=1)
+        return idx, dist
 
     def predict_quantiles(self, test: pd.DataFrame) -> np.ndarray:
         idx, _ = self.neighbors(test)
@@ -89,6 +93,8 @@ class PickBaseline(_NeighborModel):
 
 class StatsKnn(_NeighborModel):
     name = "Stats kNN"
+    MIN_OVERLAP = 0.7
+    OVERLAP_PENALTY = 1e3
 
     def __init__(self, k: int | None = None, features: list[str] | None = None) -> None:
         super().__init__(k)
@@ -105,7 +111,18 @@ class StatsKnn(_NeighborModel):
 
     def _distances(self, test: pd.DataFrame) -> np.ndarray:
         xt = self.scaler.transform(test[self.features]) * self.w
-        return nan_euclidean_distances(xt, self.xtrain)
+        d = nan_euclidean_distances(xt, self.xtrain)
+        # Hubness guard: a player missing most features (JUCO, Division II, no college
+        # games) is "close" to everyone on the one or two features left. Only allow comps
+        # sharing at least MIN_OVERLAP of the prospect's available (weighted) features.
+        has_t = (~np.isnan(xt)) & (self.w > 0)
+        has_r = (~np.isnan(self.xtrain)) & (self.w > 0)
+        shared = has_t.astype(float) @ has_r.T.astype(float)
+        own = has_t.sum(axis=1, keepdims=True).astype(float)
+        # Penalize rather than exclude, so a prospect with few eligible comps still gets
+        # the nearest low-overlap players, after every eligible one.
+        d[shared < self.MIN_OVERLAP * np.maximum(own, 1.0)] += self.OVERLAP_PENALTY
+        return d
 
     def feature_gaps(self, test_row: pd.DataFrame, train_idx: int) -> pd.Series:
         """Weighted standardized gap per feature between a prospect and one comp

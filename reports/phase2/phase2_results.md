@@ -49,9 +49,9 @@ Agreement with award/role anchors: 66.9% exact.
 | band        |   n |   median |
 |:------------|----:|---------:|
 | Picks 1-5   | 150 |       14 |
+| Picks 6-14  | 270 |       11 |
 | Picks 15-30 | 477 |        8 |
 | Picks 31-60 | 876 |        3 |
-| Picks 6-14  | 270 |       11 |
 
 ## Cox model (concordance 0.688)
 

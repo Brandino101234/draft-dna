@@ -79,3 +79,55 @@ def test_backtest_outputs_monotone_quantiles_for_every_test_player() -> None:
     q = bt.qmatrix(pred)
     assert (np.diff(q, axis=1) >= 0).all()
     assert len(pred) == (df.draft_year >= bt.FIRST_TEST_YEAR).sum()
+
+
+def test_tier_probabilities_sum_to_one_and_follow_cdf() -> None:
+    from draft_dna.models.projections import tier_probabilities
+
+    q = np.vstack([norm.ppf(M.QS, loc=1.0, scale=0.8), np.linspace(0, 3, len(M.QS))])
+    cuts = [0.01, 0.32, 1.01, 1.76, 2.37]
+    tp = tier_probabilities(q, cuts)
+    assert np.allclose(tp.sum(axis=1), 1.0)
+    assert (tp >= 0).all()
+    # P(All-Star or better) equals 1 - CDF at the All-Star cutoff.
+    assert tp[0, 4:].sum() == pytest.approx(1 - M.cdf_at(q[:1], 1.76)[0])
+
+
+def test_conformal_shifts_quantiles_to_match_calibration_errors() -> None:
+    from draft_dna.models.distribution import Conformal
+
+    class Constant:
+        name = "constant"
+
+        def fit(self, train: pd.DataFrame, y: np.ndarray) -> "Constant":
+            return self
+
+        def predict_quantiles(self, test: pd.DataFrame) -> np.ndarray:
+            return np.zeros((len(test), len(M.QS)))  # always predicts 0 everywhere
+
+    rng = np.random.default_rng(1)
+    years = np.repeat(np.arange(2000, 2010), 200)
+    train = pd.DataFrame({"draft_year": years})
+    y = rng.uniform(0, 1, len(years))  # true quantile tau = tau
+    model = Conformal(Constant, calib_classes=3, min_fit_classes=4).fit(train, y)
+    q = model.predict_quantiles(pd.DataFrame({"draft_year": [2010]}))[0]
+    assert np.allclose(q, M.QS, atol=0.05)
+
+
+def test_stats_knn_does_not_pick_hub_players_with_missing_data() -> None:
+    from draft_dna.models.knn import StatsKnn
+
+    feats = ["a", "b", "c", "d"]
+    train = pd.DataFrame(
+        {
+            "bbref_id": ["full_near", "full_far", "hub"],
+            "a": [1.0, 5.0, np.nan], "b": [1.0, 5.0, np.nan],
+            "c": [1.0, 5.0, np.nan], "d": [1.0, 5.0, 1.2],
+        }
+    )  # fmt: skip
+    test = pd.DataFrame({"bbref_id": ["x"], "a": [1.1], "b": [0.9], "c": [1.0], "d": [1.2]})
+    m = StatsKnn(k=2, features=feats).fit(train, np.zeros(3))
+    idx, _ = m.neighbors(test)
+    # Without the overlap guard, "hub" (only feature d, identical) would rank first.
+    assert train.iloc[idx[0][0]]["bbref_id"] == "full_near"
+    assert "hub" not in set(train.iloc[idx[0]]["bbref_id"])
