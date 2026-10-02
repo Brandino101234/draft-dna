@@ -46,7 +46,15 @@ TABLES: list[tuple[str, str, list[str] | None]] = [
     (
         "outcomes",
         "outcomes_through_n",
-        ["bbref_id", "n", "peak3_graded", "all_star_selections", "all_nba_selections"],
+        [
+            "bbref_id",
+            "n",
+            "peak3_graded",
+            "all_star_selections",
+            "all_nba_selections",
+            "all_defense_selections",
+            "dpoy_awards",
+        ],
     ),
 ]
 

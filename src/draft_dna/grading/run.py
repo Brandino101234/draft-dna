@@ -128,13 +128,15 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     mean[final], sd[final], weight[final] = B.s(obs_final[final]), 0.0, 1.0
     pq = grid.copy()  # 0 seasons: the (already conformal-calibrated) draft-night range
     seasons = out["seasons"].to_numpy()
+    # Peak value through year 8 can never be below the peak already reached.
+    reached = np.nan_to_num(out["peak_so_far"].to_numpy(dtype=float), nan=0.0)
     for n in range(1, B.FINAL_N):
         rows = (seasons == n) & ~final
         if rows.any():
-            pq[rows] = zcal[n].quantiles(B.Posterior(mean[rows], sd[rows], weight[rows]))
+            q = zcal[n].quantiles(B.Posterior(mean[rows], sd[rows], weight[rows]))
+            q = np.maximum(q, reached[rows, None])
+            pq[rows] = B.shrink_floor(q, reached[rows], n)
     pq[final] = (B.s(obs_final[final]) ** 2)[:, None]
-    # Peak value through year 8 can never be below the peak already reached.
-    reached = np.nan_to_num(out["peak_so_far"].to_numpy(dtype=float), nan=0.0)
     pq = np.maximum(pq, reached[:, None])
 
     out["projected_floor"] = grid[:, M.qidx(M.FLOOR)]
@@ -178,7 +180,12 @@ def validate(s: Settings, fit_max_class: int = 2010) -> pd.DataFrame:
         obs = drafted.loc[test.index, n].to_numpy() if n else y
         post = B.update(m0, s0, obs, meas.get(n))
         variants = [("normal", post.quantiles())]
-        variants.append(("calibrated", grid if n == 0 else zcal[n].quantiles(post)))
+        if n == 0:
+            cal = grid
+        else:
+            cal = np.maximum(zcal[n].quantiles(post), obs[:, None])
+            cal = B.shrink_floor(cal, obs, n)
+        variants.append(("calibrated", cal))
         for label, q in variants:
             rows.append(
                 {
