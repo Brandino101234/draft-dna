@@ -94,7 +94,8 @@ def graded_peak(otn: pd.DataFrame, cuts: list[float]) -> pd.Series:
             has("all_star_selections") | has("dpoy_awards"),
             has("all_defense_selections"),
         ],
-        [cuts[4], cuts[3], cuts[2]],
+        # just above the cutoff, so the floored peak falls inside that tier
+        [cuts[4] + 1e-6, cuts[3] + 1e-6, cuts[2] + 1e-6],
         -np.inf,
     )
     return pd.Series(np.maximum(otn["peak3_graded"].to_numpy(dtype=float), floor), otn.index)

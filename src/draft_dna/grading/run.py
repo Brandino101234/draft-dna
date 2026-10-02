@@ -22,10 +22,11 @@ from draft_dna.config import Settings
 from draft_dna.eval import backtest as bt
 from draft_dna.eval import metrics as M
 from draft_dna.eval.phase3 import pick_conformal
+from draft_dna.eval.phase6 import FRANCHISE
 from draft_dna.grading import bayes as B
 from draft_dna.ingest.storage import read_table, write_table
 from draft_dna.logging_utils import get_logger
-from draft_dna.outcomes.tiers import graded_peak, tier_cuts
+from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
 
 log = get_logger(__name__)
 
@@ -102,6 +103,9 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     out["player_name"] = out.index.map(players["player_name"])
     out["draft_year"] = out.index.map(players["draft_year"]).astype(int)
     out["pick"] = out.index.map(players["pick_overall"])
+    out["team"] = out.index.map(players["team_id"])
+    out["franchise"] = out["team"].replace(FRANCHISE)
+    out["prospect_source"] = out.index.map(players["prospect_source"])
     out["projection_type"] = np.where(
         priors["retrospective"].astype(bool), "retrospective", "as of draft night"
     )
@@ -146,6 +150,13 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     out["current_median"] = pq[:, M.qidx(M.MEDIAN)]
     out["current_ceiling"] = pq[:, M.qidx(M.CEILING)]
     out["data_weight"] = weight
+    # Plain-language summaries: the tier the median falls in, and P(All-Star or better).
+    cuts = tier_cuts(s)
+    star = TIERS.index("All-Star")
+    for kind, q in (("projected", grid), ("current", pq)):
+        med = q[:, M.qidx(M.MEDIAN)]
+        out[f"{kind}_tier"] = [TIERS[i] for i in np.searchsorted(cuts, med, side="right")]
+        out[f"{kind}_p_all_star"] = tier_probabilities(q, cuts)[:, star:].sum(axis=1)
     out["confidence"] = 1 - np.clip(sd / s0, 0, 1)
     out["grade"] = B.grade_letter(out["current_median"].to_numpy(), grid)
     out.loc[out["seasons"] == 0, "grade"] = "-"  # no NBA games yet: projection only
