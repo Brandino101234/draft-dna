@@ -121,4 +121,25 @@ Stratified sample of ESPN play-by-play: 20 drafted-player team-seasons × 8 game
 - **Shot-type splits** (rim / midrange / three / dunk) already exist from Barttorvik for 521 of 535 drafted college players in the 2010–2020 classes.
 - **NBA shot charts** (stats.nba.com) are complete from 1996-97 (e.g. Kobe Bryant's 422 rookie FGA all present with zones and x/y).
 - A full ESPN pull of every drafted-player team-season 2008–2026 is ~41,600 games, about 13 hours at 1 request/second. ESPN's API is unofficial (no robots.txt; not a licensed feed): personal research only, cached, polite.
-Decision on how to proceed: pending user review.
+Decision (user, after review): two-tier design (D026).
+
+
+### D026: Shot DNA design (two tiers)
+**Tier A, shot type (headline test in Phase 5):**
+- **Sources:** Barttorvik rim / midrange / three / dunk splits (2010+) plus ESPN play-by-play assisted vs. unassisted makes (2008+).
+- **Shot mix** comes from the final pre-draft season.
+- **Zone efficiency** uses all pre-draft seasons, shrunk with empirical Bayes toward that season's Division I average. The beta prior is fit by method of moments on every D-I player that season, so it uses pre-draft information only. Prior strength is about 50 shots at the rim, about 160 in the midrange, and 300–600 from three. Three-point percentage is the noisiest, which matches the research consensus.
+
+**Tier B, coordinates (cards and a secondary test):**
+- **Court frame:** ESPN x/y is in feet; the basket sits at y = 1.0, fit from the data. That placement classifies twos vs. threes 98–100% of the time in every line era.
+- **Consistency filter:** coordinates that contradict the shot's value (e.g. a three logged at the rim) are dropped. That's about 1% of shots, mostly 2020–2025.
+- **Zones:** rim < 4 ft, short mid 4–14 ft, long mid 14 ft+, corner three (|dx| ≥ 20 and dy ≤ 8), above-the-break three. On NBA data, these agree with stats.nba.com's own zones 98–100%.
+- **Era normalization:** style maps rescale distance so the 3-point line sits at 22.15 ft in every era. Without it, pooled seasons produced a spurious "threes from the old 20.75 ft line" style.
+- **Shot maps:** each player's map is a Gaussian KDE (bandwidth 1.5 ft) on a 1-ft grid, folded left/right.
+- **Eligibility:** ≥100 shots with valid coordinates and ≥40% coordinate coverage. That's 395 drafted players, including 53–92% of the 2014–2020 classes and 92% of the 2026 class.
+
+**Shot styles:** NMF with k = 6, chosen where the gain per added style drops from 9–12% to 5–7%. A k = 10 fit split one style into near-duplicate rim blobs and three-point angles. Style weights are mixture weights, not shot shares; use tier-A or zone shares for "% of shots from X." For the Phase 5 backtest, NMF is refit inside each fold.
+
+**Comps guardrail:** shot-based comps must be within 3 inches of height and share the position bucket (`GuardedKnn`).
+
+**NBA shot charts:** stats.nba.com shot charts for each player's first 4 NBA seasons (2.24M shots, 2,424 players) are standardized into the same frame for Phase 7's "plays like" comps. stats.nba.com throttles sustained pulls, so it is accessed at 3.5 s/request with retries, and any player-season that keeps failing is skipped.

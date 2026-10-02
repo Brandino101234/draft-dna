@@ -1,7 +1,7 @@
 """Name and visualize NMF shot styles.
 
 Choosing k: NMF reconstruction error always falls as k grows; we pick the smallest k
-after which adding a style improves the fit by less than 5% (an "elbow"), then check
+after which adding a style improves the fit by less than 8% (an "elbow"), then check
 the styles are interpretable. Each style is labeled by where its mass sits (rim, short
 mid, long mid, corner three, above-the-break three) on the shared court grid.
 """
@@ -21,7 +21,7 @@ from sklearn.decomposition import NMF
 from draft_dna.features import shot_xy
 from draft_dna.viz.court import draw_folded_half_court
 
-ELBOW_GAIN = 0.05
+ELBOW_GAIN = 0.08  # gains drop from ~9-12% to 5-7% after k=6 (D026)
 ZONE_LABELS = {
     "rim": "Rim attacker",
     "short_mid": "Paint / floater",
@@ -70,7 +70,16 @@ def describe_styles(model: NMF) -> pd.DataFrame:
         grid = shot_xy.component_grid(model, i)
         xx, yy = np.meshgrid(shot_xy.GRID_X, shot_xy.GRID_Y, indexing="ij")
         avg_ft = float((np.hypot(xx, yy) * grid).sum() / grid.sum())
-        rows.append({"style": f"style_{i}", "label": ZONE_LABELS[top], "avg_ft": avg_ft, **mass})
+        angle = float((np.degrees(np.arctan2(np.maximum(yy, 0), xx)) * grid).sum() / grid.sum())
+        rows.append(
+            {
+                "style": f"style_{i}",
+                "label": ZONE_LABELS[top],
+                "avg_ft": avg_ft,
+                "avg_angle": angle,
+                **mass,
+            }
+        )
     out = pd.DataFrame(rows)
     # Disambiguate repeated labels by their second-largest zone, then by average distance.
     dup = out["label"].duplicated(keep=False)
@@ -79,6 +88,13 @@ def describe_styles(model: NMF) -> pd.DataFrame:
         out.loc[i, "label"] = (
             f"{ZONE_LABELS[zones.index[0]]} + {ZONE_LABELS[zones.index[1]].lower()}"
         )
+    # Still tied: say where it comes from (baseline side vs. middle of the floor), then
+    # how far out.
+    still = out["label"].duplicated(keep=False)
+    where = np.where(out["avg_angle"] < 45, "baseline side", "middle")
+    out.loc[still, "label"] = [
+        f"{lab}, {w}" for lab, w in zip(out.loc[still, "label"], where[still], strict=True)
+    ]
     still = out["label"].duplicated(keep=False)
     out.loc[still, "label"] = [
         f"{lab} ({ft:.0f} ft)"

@@ -38,11 +38,12 @@
 - [x] Per-player output: top-15 comps, floor/median/ceiling, tier probabilities
 
 ## Phase 4: Shot audit and Shot DNA (`phase-4-shot-dna`)
-- [x] Coverage audit by season, conference, player → **stop and report** (D025)
-- [ ] Court coordinate standardization; NCAA 3PT line eras (2008–09, 2019–20)
-- [ ] Zone frequencies, FT rate, EB-shrunk zone efficiency, assisted rates
-- [ ] KDE heatmaps → NMF shot styles
-- [ ] Size/position guardrail for comps
+- [x] Coverage audit by season, conference, player → stopped and reported (D025)
+- [x] Court coordinate standardization; NCAA 3PT line eras (2008-09, 2019-20); era-normalized style maps
+- [x] Zone frequencies, FT rate, EB-shrunk zone efficiency, assisted rates
+- [x] KDE heatmaps → NMF shot styles (k = 6)
+- [x] Size/position guardrail for comps
+- [x] NBA early-career shot charts (for Phase 7 "plays like")
 
 ## Phase 5: Does shot data help? (`phase-5-shot-vs-stats`)
 - [ ] Pre-registered comparison in DECISIONS.md
