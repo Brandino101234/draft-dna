@@ -67,3 +67,22 @@ def test_plays_like_picks_nearest_style_within_height_and_never_self() -> None:
     ids = out["plays_like_id"].tolist()
     assert "self" not in ids and "tall_twin" not in ids  # 7 inches taller is filtered out
     assert ids[0] == "near" and out["basis"].eq("NBA shots").all()
+
+
+def test_recruit_groups_treat_missing_rank_as_unranked() -> None:
+    import pandas as pd
+
+    from draft_dna.eval.recruits import recruit_group
+
+    g = recruit_group(pd.Series([1, 10, 11, 25, 26, 50, 51, 100, None]))
+    assert g.tolist() == [
+        "RSCI 1-10",
+        "RSCI 1-10",
+        "RSCI 11-25",
+        "RSCI 11-25",
+        "RSCI 26-50",
+        "RSCI 26-50",
+        "RSCI 51-100",
+        "RSCI 51-100",
+        "Unranked",
+    ]

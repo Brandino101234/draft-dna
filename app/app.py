@@ -39,6 +39,7 @@ PAGES = {
     "redraft": "Redraft",
     "steals": "Steals & busts",
     "teams": "Teams",
+    "recruits": "Recruits",
     "compare": "Compare",
     "styles": "Style map",
     "tracker": "2026 tracker",
@@ -60,6 +61,9 @@ def load() -> dict[str, pd.DataFrame]:
         "plays_like": read_table("modeled", "grading", "plays_like", S),
         "style_map": read_table("modeled", "grading", "style_map", S),
         "tracker": read_table("modeled", "grading", "rookie_tracker", S),
+        "recruits": read_table("modeled", "recruits", "players", S),
+        "recruit_summary": read_table("modeled", "recruits", "summary", S),
+        "recruit_tests": read_table("modeled", "recruits", "tests", S),
     }
 
 
@@ -453,6 +457,62 @@ elif page == "teams":
             "worst_pick": "Worst pick vs slot",
         },
     )
+
+elif page == "recruits":
+    st.subheader("Did teams misjudge high-school recruiting rankings?")
+    tests = data["recruit_tests"].set_index(["horizon", "scope"])
+    t4 = tests.loc[(4, "all picks")]
+    st.markdown(
+        f"**No.** Top-10 high-school recruits (RSCI) were drafted about 20 picks earlier than "
+        f"unranked players, and after that their careers matched their draft slot like "
+        f"everyone else's. There is no trend from recruiting rank to beating the slot "
+        f"(year 4: rho = {t4['spearman_rho']:+.2f}, p = {t4['p_value']:.2f}; "
+        f"n = {int(t4['n'])} college picks, 2005-2021). Teams already price recruiting "
+        "pedigree into the pick. The analysis plan was written down before it ran "
+        "(DECISIONS D035)."
+    )
+    chart = ROOT / "reports" / "recruits" / "recruit_rank_vs_slot.png"
+    if chart.exists():
+        st.image(str(chart), width="stretch")
+    summ = data["recruit_summary"]
+    show = summ[(summ["horizon"] == 4) & (summ["scope"] == "all picks")]
+    st.dataframe(
+        show[["group", "n", "avg_pick", "mean_pit", "ci_lo", "ci_hi", "beat_median"]],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "group": "Recruit rank",
+            "avg_pick": st.column_config.NumberColumn("Avg pick", format="%.0f"),
+            "mean_pit": st.column_config.NumberColumn(
+                "Avg PIT (0.5 = matched slot)", format="%.3f"
+            ),
+            "ci_lo": st.column_config.NumberColumn("95% CI low", format="%.3f"),
+            "ci_hi": st.column_config.NumberColumn("95% CI high", format="%.3f"),
+            "beat_median": st.column_config.ProgressColumn(
+                "Beat slot median", format="percent", min_value=0, max_value=1
+            ),
+        },
+    )
+    rec = data["recruits"]
+    rec4 = rec[rec["horizon"] == 4].set_index("bbref_id")
+    joined = grades.set_index("bbref_id").join(rec4[["recruit_rank", "group", "pit"]], how="inner")
+    joined = joined.reset_index()
+    cols = ["bbref_id", "player_name", "draft_year", "pick", "grade", "current_tier"]
+    cfg = {
+        "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+        "current_tier": "Tier",
+        "recruit_rank": st.column_config.NumberColumn("RSCI rank", format="%d"),
+    }
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Unranked in high school, became stars**")
+        stars = joined[joined["group"] == "Unranked"].nlargest(15, "current_median")
+        clickable(stars[cols], key="unranked_stars", column_config=cfg)
+    with right:
+        st.markdown("**Top-10 recruits who fell furthest short of their slot**")
+        short = joined[joined["group"] == "RSCI 1-10"].nsmallest(15, "pit")
+        clickable(short[[*cols, "recruit_rank"]], key="top_recruit_misses", column_config=cfg)
+    st.caption("Click a row to open that player's card. Lists cover 2005-2021 college picks.")
 
 elif page == "compare":
     names = list(options)
