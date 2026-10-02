@@ -131,7 +131,7 @@ def analyze(s: Settings) -> dict[str, pd.DataFrame]:
         .agg(
             games=("game_id", "size"),
             pbp=("has_pbp", "mean"),
-            xy_games=("has_xy", lambda x: x.fillna(False).mean()),
+            xy_games=("has_xy", lambda x: x.astype("boolean").fillna(False).astype(bool).mean()),
             typed=("typed_share", "mean"),
         )
         .reset_index()
@@ -149,14 +149,20 @@ def analyze(s: Settings) -> dict[str, pd.DataFrame]:
     by_conf = (
         g[g["has_pbp"]]
         .groupby("conf")
-        .agg(games=("game_id", "size"), xy_games=("has_xy", lambda x: x.fillna(False).mean()))
+        .agg(
+            games=("game_id", "size"),
+            xy_games=("has_xy", lambda x: x.astype("boolean").fillna(False).astype(bool).mean()),
+        )
         .sort_values("games", ascending=False)
         .reset_index()
     )
     by_tv = (
         g[g["has_pbp"] & (g["season"] >= 2015)]
         .groupby("televised")
-        .agg(games=("game_id", "size"), xy_games=("has_xy", lambda x: x.fillna(False).mean()))
+        .agg(
+            games=("game_id", "size"),
+            xy_games=("has_xy", lambda x: x.astype("boolean").fillna(False).astype(bool).mean()),
+        )
         .reset_index()
     )
     kinds = own.groupby("season")["kind"].value_counts(normalize=True).unstack().fillna(0)
@@ -240,22 +246,25 @@ def report(s: Settings) -> dict[str, object]:
     fig, ax = plt.subplots(figsize=(9.5, 4.6), facecolor=surface)
     series = [
         ("pbp", "Games with play-by-play", "#2a78d6"),
-        ("fga_typed", "Shots with a shot type", "#eb6834"),
+        ("fga_typed", "Shots with a shot type (in games with play-by-play)", "#eb6834"),
         ("fga_with_xy", "Shots with x/y coordinates", "#1baf7a"),
     ]
     for col, label, color in series:
-        ax.plot(bs["season"], bs[col], color=color, linewidth=2, marker="o", markersize=4)
-        ax.text(
-            bs["season"].iloc[-1] + 0.3,
-            bs[col].iloc[-1],
-            label,
-            color=text,
-            fontsize=9,
-            va="center",
+        ax.plot(
+            bs["season"], bs[col], color=color, linewidth=2, marker="o", markersize=4, label=label
         )
+    ax.legend(
+        frameon=False,
+        fontsize=9,
+        loc="upper left",
+        bbox_to_anchor=(0, -0.13),
+        ncol=3,
+        labelcolor=text,
+    )
+    ax.set_xticks(range(int(bs["season"].min()), int(bs["season"].max()) + 1, 2))
     ax.set_ylim(0, 1.05)
     ax.set_yticks(np.linspace(0, 1, 6), [f"{v:.0%}" for v in np.linspace(0, 1, 6)])
-    ax.set_xlim(bs["season"].min() - 0.5, bs["season"].max() + 6.5)
+    ax.set_xlim(bs["season"].min() - 0.5, bs["season"].max() + 0.5)
     ax.set_facecolor(surface)
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)

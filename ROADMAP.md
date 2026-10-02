@@ -38,7 +38,7 @@
 - [x] Per-player output: top-15 comps, floor/median/ceiling, tier probabilities
 
 ## Phase 4: Shot audit and Shot DNA (`phase-4-shot-dna`)
-- [ ] Coverage audit by season, conference, player → **stop and report**
+- [x] Coverage audit by season, conference, player → **stop and report** (D025)
 - [ ] Court coordinate standardization; NCAA 3PT line eras (2008–09, 2019–20)
 - [ ] Zone frequencies, FT rate, EB-shrunk zone efficiency, assisted rates
 - [ ] KDE heatmaps → NMF shot styles

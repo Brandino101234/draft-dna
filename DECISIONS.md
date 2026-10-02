@@ -111,3 +111,14 @@ Features with fewer than 30 observed values in a fold's training data (e.g. BPM 
 
 ### D024: Non-college prospects
 International and high-school prospects have only age, size and (sometimes) combine data, so their stats comps are physical-profile comps (LeBron → other high-school bigs; Wembanyama → tall international players). Their projections come from draft slot like everyone else's.
+
+### D025: College shot-data audit findings (Phase 4a)
+Stratified sample of ESPN play-by-play: 20 drafted-player team-seasons × 8 games for each college season 2008–2026 (3,148 games, 140,000+ field-goal attempts). Full report: `reports/phase4/shot_audit.md`.
+- **Shot type** (layup, dunk, tip, jumper, three) is present on 100% of field-goal attempts in every game that has play-by-play, from 2008 onward.
+- **Play-by-play itself** exists for 77–100% of games, except a gap in 2012–2013 (37–40%).
+- **x/y coordinates** do not exist before 2014. From 2014–2025 only 11–67% of shots have them; coverage *fell* recently (2023: 17%, 2024: 11%), then reached 100% in 2025-26. They come mostly from televised games (48% of televised vs 9% of untelevised games) and high-major conferences (~45% Big Ten / ACC / SEC / Big 12; ≤10% A-10, MWC, CAA, MAC, MVC).
+- **Per drafted player** (≥20 sampled shots): median 21% of shots carry coordinates; for college seasons 2014–2020, 69% of players reach ≥40% coverage. That leaves roughly 230 coordinate-eligible drafted players with 6-year outcomes, skewed toward televised high-major programs, which is a selection bias.
+- **Shot-type splits** (rim / midrange / three / dunk) already exist from Barttorvik for 521 of 535 drafted college players in the 2010–2020 classes.
+- **NBA shot charts** (stats.nba.com) are complete from 1996-97 (e.g. Kobe Bryant's 422 rookie FGA all present with zones and x/y).
+- A full ESPN pull of every drafted-player team-season 2008–2026 is ~41,600 games, about 13 hours at 1 request/second. ESPN's API is unofficial (no robots.txt; not a licensed feed): personal research only, cached, polite.
+Decision on how to proceed: pending user review.
