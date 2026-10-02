@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from draft_dna.config import Settings, get_settings
-from draft_dna.ingest import barttorvik, bbref, cbb, nba_stats
+from draft_dna.ingest import barttorvik, bbref, cbb, espn, nba_stats
 from draft_dna.ingest.fetcher import Fetcher
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
@@ -108,6 +108,49 @@ def run_cbb_players(settings: Settings | None = None) -> None:
         write_table(df, "raw", "cbb", name, s)
 
 
+def run_espn_shots(settings: Settings | None = None) -> None:
+    """Every game of every drafted player's pre-draft team-season, 2008-2026 (ESPN PBP).
+
+    Writes one parquet per season so a long pull keeps its progress; reruns are cheap
+    because every response is cached.
+    """
+    from draft_dna.eval.shot_audit import SEASONS, team_seasons
+
+    s = settings or get_settings()
+    f = Fetcher(espn.SOURCE, settings=s)
+    ts, _ = team_seasons(s)
+    ts = ts.dropna(subset=["espn_team_id"])
+    write_table(ts, "raw", "espn", "team_seasons", s)
+    now = pd.Timestamp.now(tz="UTC")
+    for season in SEASONS:
+        shots, rosters, games = [], [], []
+        for r in ts[ts["season"] == season].itertuples():
+            sched = espn.schedule(f, int(r.espn_team_id), season)
+            if sched.empty:
+                continue
+            sched = sched[pd.to_datetime(sched["date"], utc=True) < now]
+            games.append(sched.assign(school_slug=r.school_slug))
+            for gid in sched["game_id"]:
+                sh, ro, _ = espn.game_shots(f, int(gid))
+                shots.append(sh)
+                rosters.append(ro)
+        if not games:
+            continue
+        g = pd.concat(games, ignore_index=True)
+        sh = pd.concat(shots, ignore_index=True).drop_duplicates()
+        ro = pd.concat(rosters, ignore_index=True).drop_duplicates()
+        write_table(g.assign(season=season), "raw", "espn", f"games_{season}", s)
+        write_table(sh.assign(season=season), "raw", "espn", f"shots_{season}", s)
+        write_table(ro.assign(season=season), "raw", "espn", f"rosters_{season}", s)
+        log.info(
+            "espn %d: %d games, %d shots (%d network requests so far)",
+            season,
+            len(g),
+            len(sh),
+            f.network_requests,
+        )
+
+
 STEPS = {
     "bbref-league": run_bbref_league,
     "bbref-players": run_bbref_players,
@@ -115,4 +158,5 @@ STEPS = {
     "cbb-players": run_cbb_players,
     "barttorvik": run_barttorvik,
     "nba-api": run_nba_api,
+    "espn-shots": run_espn_shots,
 }
