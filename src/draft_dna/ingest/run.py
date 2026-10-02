@@ -6,7 +6,7 @@ import pandas as pd
 
 from draft_dna.config import Settings, get_settings
 from draft_dna.ingest import barttorvik, bbref, cbb, espn, nba_stats
-from draft_dna.ingest.fetcher import Fetcher
+from draft_dna.ingest.fetcher import Fetcher, FetchError
 from draft_dna.ingest.storage import read_table, table_path, write_table
 from draft_dna.logging_utils import get_logger
 
@@ -164,13 +164,20 @@ def run_nba_shots(settings: Settings | None = None) -> None:
     early = seasons.sort_values("season").groupby("bbref_id").head(NBA_SHOT_SEASONS)
     pid = xw.set_index("bbref_id")["nba_person_id"].astype(int)
     frames = []
+    skipped = 0
     for i, r in enumerate(early.itertuples(), 1):
-        df = nba_stats.shot_chart(int(pid[r.bbref_id]), int(r.season), s)
+        try:
+            df = nba_stats.shot_chart(int(pid[r.bbref_id]), int(r.season), s)
+        except FetchError as exc:  # persistent throttling: skip; a rerun retries it
+            log.warning("skipping %s %s: %s", r.bbref_id, r.season, exc)
+            skipped += 1
+            continue
         if not df.empty:
             frames.append(df.assign(bbref_id=r.bbref_id, season=int(r.season)))
         if i % 500 == 0:
             log.info("nba shots: %d/%d player-seasons", i, len(early))
     write_table(pd.concat(frames, ignore_index=True), "raw", "nba_api", "shots_early_career", s)
+    log.info("nba shots done; %d player-seasons skipped (rerun to retry)", skipped)
 
 
 STEPS = {
