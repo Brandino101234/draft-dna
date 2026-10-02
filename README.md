@@ -220,3 +220,41 @@ The most plausible reading: a prospect's shot profile is mostly *downstream* of 
 - **Sample size:** shot data starts with the 2010 class, so the cohort is ~415 players. Effects smaller than about 0.5% of forecast error can't be detected.
 - **Coordinates:** location data covers the 2014+ classes and leans toward televised games.
 - **Outcome:** "success" means peak value by year 4 (primary) or year 6 (check). A trait that only pays off late in a career would be missed.
+
+## Phase 6: Who beats their projection, and why
+
+Each player's draft-night projection gives a range. A **PIT score** says where his actual career landed inside it: 0.5 = right at the projected median, 0.9 = beat 90% of the range. The projections are calibrated (average PIT 0.49–0.51), so groups that average well above or below 0.5 systematically beat or miss their draft slot.
+
+![Who beats projection](reports/phase6/who_beats_projection.png)
+
+- **International and pro-team picks fall short of their draft slot** (average PIT 0.40). Part of this is stash risk: second-rounders who never come over.
+- **Late first-rounders (picks 15–30) slightly beat their slot** (0.54), as do forwards.
+- **No trend by era.** Teams draft no better or worse against slot history than in the early 2000s.
+
+![Team effects](reports/phase6/team_effects.png)
+
+**No team detectably develops its picks better than their draft slot implies.** Franchise differences are no bigger than luck would produce (heterogeneity p = 0.92). Houston's and Indiana's apparent edges disappear under partial pooling.
+
+![Situation effects](reports/phase6/situation_effects.png)
+
+**Situation effects** (propensity weighting adjusts for pick, age, size, stats and background; E-values say how much hidden bias would erase each one):
+- **Before the draft:** being drafted by a bad team or onto a crowded depth chart showed no detectable effect. Neither did a coaching change during the rookie deal.
+- **After the draft:** being traded early (−0.06) and missing a quarter of games in years 1–2 (−0.25) are strongly associated with falling short. Both are more plausibly *results* of underperforming than causes: struggling players get traded and benched. The E-value for trades is only 1.5.
+
+![SHAP](reports/phase6/shap_overperformance.png)
+
+**Some pre-draft traits predict beating the draft slot early.** Size, passing, rebounding and free-throw shooting push players above their projection; high usage and turnovers push them below. One reading: teams overpay for college scoring volume.
+- **Strength of the signal:** in a strict test where each class is predicted only from earlier classes, it holds through year 4 (rank correlation 0.19, p < 0.001).
+- **Where it fades:** for college players it is gone by year 6 (0.04, p = 0.43). That's consistent with Phases 3 and 5: draft slot catches up.
+
+![Verdict reversals](reports/phase6/verdict_reversals.png)
+
+**The Year-4 Verdict holds up 86% of the time.** Of 840 players, 14% changed category between year 4 and year 8, and upgrades outnumbered downgrades 3 to 1.
+- **Late bloomers:** Stephen Curry, Shai Gilgeous-Alexander, James Harden, Domantas Sabonis and Derrick White all looked merely "within range" at year 4.
+- **Most downgrades weren't collapses.** They were early overachievers who plateaued (Anthony Davis, Paul George, Trae Young) while the projected ceiling for top picks kept rising.
+- **True late busts are rare:** 7 players, 0.8%.
+
+**Limits:**
+- **Causality:** situation effects are associations under stated assumptions, not causal estimates.
+- **Injuries:** there's no public injury history, so "missed games" mixes injury, G League stints and coach's decisions.
+- **Multiple comparisons:** segment comparisons span about 17 groups, so treat single borderline intervals as hypotheses.

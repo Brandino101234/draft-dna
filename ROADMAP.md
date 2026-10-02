@@ -53,10 +53,11 @@
 - [ ] Run the D029 confirmation test as 2023-2026 classes reach year 4
 
 ## Phase 6: Who beats their projection (`phase-6-over-under`)
-- [ ] Beat-ceiling / miss-floor rates by segment
-- [ ] Situation effects (matching, stated assumptions, sensitivity)
-- [ ] SHAP for overperformance drivers
-- [ ] Year-4 Verdict → Career Grade overturn rate
+- [x] Beat-ceiling / miss-floor rates and mean PIT by pick, position, age, era, background, team
+- [x] Team effects with partial pooling + heterogeneity test (no detectable team effect)
+- [x] Situation effects (propensity weighting, balance checks, E-values; stated limits)
+- [x] SHAP for overperformance drivers, with leave-classes-out and strict rolling checks
+- [x] Year-4 Verdict -> Career Grade overturn rate (14%)
 
 ## Phase 7: Cards and app (`phase-7-app`)
 - [ ] Grading state machine with Bayesian updating

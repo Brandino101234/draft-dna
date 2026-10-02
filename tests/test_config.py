@@ -39,3 +39,9 @@ def test_data_and_secrets_are_gitignored() -> None:
 def test_config_is_valid_yaml(tmp_path: Path) -> None:
     raw = yaml.safe_load(DEFAULT_CONFIG.read_text())
     assert "draft_classes" in raw
+
+
+def test_db_table_names_are_valid_identifiers() -> None:
+    from draft_dna.db import table_name
+
+    assert table_name(Path("x/backtest/p5b_knn_w0.25.parquet")) == "backtest__p5b_knn_w0_25"
