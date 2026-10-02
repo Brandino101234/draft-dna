@@ -1,14 +1,16 @@
 """Command-line entry point: `draft-dna <command>`.
 
-Commands are stubs until their phase lands; each raises a clear message
-rather than silently doing nothing.
+Commands for later phases are stubs that exit with a clear message.
 """
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import typer
 
 from draft_dna.config import get_settings
+from draft_dna.ingest.run import STEPS
 from draft_dna.logging_utils import get_logger, setup_logging
 
 app = typer.Typer(no_args_is_help=True, help="Draft DNA data and modeling pipeline.")
@@ -34,9 +36,41 @@ def info() -> None:
 
 
 @app.command()
+def ingest(
+    steps: Annotated[
+        list[str] | None, typer.Argument(help=f"Steps to run (default: all): {list(STEPS)}")
+    ] = None,
+) -> None:
+    """Pull raw data from sources. Resumable: cached pages are never re-fetched."""
+    for name in steps or list(STEPS):
+        if name not in STEPS:
+            raise typer.BadParameter(f"unknown step {name!r}; choose from {list(STEPS)}")
+        log.info("== ingest %s", name)
+        STEPS[name]()
+
+
+@app.command()
+def transform() -> None:
+    """Rebuild staging, crosswalk, modeled tables and DuckDB from raw (no network)."""
+    from draft_dna.build import transform as run_transform
+
+    run_transform()
+
+
+@app.command()
+def report() -> None:
+    """Write data coverage reports to reports/phase1/."""
+    from draft_dna.eval import coverage
+
+    coverage.run()
+
+
+@app.command()
 def build() -> None:
-    """Rebuild all data from source (cached raw pulls are reused). Phase 1."""
-    raise typer.Exit(_not_yet("build", 1))
+    """Ingest every source (cached pages are reused) and run all transforms."""
+    from draft_dna.build import build_all
+
+    build_all()
 
 
 @app.command()

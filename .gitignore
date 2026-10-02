@@ -22,3 +22,6 @@ dist/
 # Notebooks / OS
 .ipynb_checkpoints/
 .DS_Store
+
+# Run logs
+logs/
