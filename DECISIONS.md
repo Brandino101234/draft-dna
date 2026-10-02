@@ -56,3 +56,29 @@ There is no reliable, scrapeable source of international club stats covering 199
 
 ### D015: In-season updates
 Pages for the current NBA season are re-fetched when their cache is older than 20 hours; all other pages are cached forever. Rerunning `draft-dna ingest bbref-league && draft-dna transform` during 2026-27 updates season totals, advanced stats, team records and coaches. Game-level updates for the live tracker are part of Phase 7's `make refresh`.
+
+### D016: Career value = VORP + Win Shares blend, 75% peak / 25% total
+Three per-season value definitions were compared: **A** VORP, **B** the mean of z-scored VORP and Win Shares, **C** a one-factor model of VORP, WS, minutes, shrunken BPM and starts. Each was turned into a career composite and validated for the 1996–2016 classes, 10 seasons after the draft, with 95% bootstrap CIs (1,000 resamples of players):
+
+| check | A: VORP | B: blend | C: factor |
+|---|---|---|---|
+| AUC, ever All-NBA | 0.990 | 0.991 | 0.991 |
+| AUC, ever All-Star | 0.982 | 0.984 | 0.983 |
+| Spearman, All-Star selections | 0.486 | 0.487 | 0.485 |
+| Spearman, peak pay % of cap (yrs 5–10) | 0.766 | **0.886** | 0.818 |
+| Spearman, 2nd-contract pay vs value through yr 4 | 0.633 | **0.828** | 0.723 |
+
+All three tie on awards. On contracts, B beats A by +0.12 to +0.20, with CIs on the difference excluding zero. Why: VORP rates a below-replacement player who keeps getting minutes *below* a player who is out of the league, but teams keep paying the former, and staying in the league is part of NBA success. Win Shares rarely goes far below zero, which fixes that. C does not beat B, so the simpler B wins.
+
+**Peak vs total weighting.** Peak-heavy weightings score higher on every check, but the targets (All-Star selections, peak pay) are themselves peak-oriented, so they cannot judge how much longevity should count. 75% peak / 25% total keeps nearly all of the validated signal (peak pay 0.886 vs 0.907 for peak alone) while still crediting long careers. Peak, total, longevity and playoff value are all stored separately for later analysis.
+
+Seasons outside the NBA count as zero (a bust is an outcome, not missing data). Composites are z-scored at each N against training-class players only, so later classes never shift the scale.
+
+### D017: Tiers are cutoffs on peak value, calibrated to role and award anchors
+Tiers are defined on the same quantity the models will predict (best 3-season blend value), so a predicted distribution converts directly into tier probabilities. Cutoffs maximize balanced accuracy between neighboring anchor groups (All-NBA selection; All-Star selection; best 3-year stretch averaging ≥41 starts and ≥1,800 min; ≥1,000 min; ≥1,000 career minutes): 0.01 / 0.32 / 1.01 / 1.76 / 2.37. Agreement with anchors: 67% exact, 97% within one tier. Disagreements are intended: a tier means "played like a typical X", not "was voted X" (e.g. Andrew Wiggins, a one-time All-Star, sits at the Rotation/Starter line). "Out of league" means no positive NBA value (peak ≈ 0), not only zero games.
+
+### D018: Career end and censoring
+A career has ended if the player has not appeared in either of the last two completed seasons (2024–25, 2025–26); otherwise it is censored. One season of slack avoids counting a player who missed a year injured as retired. Never-played picks have duration 0 and an ended career.
+
+### D019: Cox model split at the rookie deal
+A single Cox model fails the proportional-hazards test for draft pick (p < 0.0001): pick matters far more during the rookie deal than afterwards. Fitting seasons 1–4 and seasons 5+ separately: each doubling of pick number multiplies the yearly hazard of a career ending by 2.07 (1.83–2.34) in seasons 1–4 but only 1.16 (1.09–1.24) afterwards; age at draft matters more later (1.26 per year vs 1.11). The seasons-5+ model passes the assumption test; the seasons 1–4 hazard ratio for pick is an average over those years (second-rounders mostly leave in years 1–2).

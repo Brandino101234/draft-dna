@@ -64,3 +64,47 @@ Counting stats are kept per 100 possessions. Shooting efficiency (TS%) and 3-poi
 - No international or G League stats (see DECISIONS D014). Those prospects are modeled on age, size, pick and combine data.
 - Opponent-dependent college rates (rebound, steal and block percentage) are unavailable before about 2010 and are not imputed.
 - "Games absent" counts every game a player didn't play (injury, rest, coach's decision, G League), not injuries alone.
+
+## Phase 2: What counts as a "better" career?
+
+### Career value
+Each NBA season gets a value score: the average of z-scored **VORP** and **Win Shares**, shifted so a season out of the league scores zero. From those season scores, every player gets these outcomes *through N seasons after the draft*:
+
+- **Peak:** best 3-season stretch
+- **Total:** sum of all seasons
+- **Longevity:** seasons with 500+ minutes
+- **Playoffs:** playoff value
+- **Career value:** 75% peak + 25% total, scaled against the 1996–2021 draft classes at the same N
+
+Measuring "through N seasons" is what lets a player with 3 seasons be compared fairly to his comps' first 3 seasons.
+
+![Validation of value definitions](reports/phase2/value_definition_validation.png)
+
+Three definitions of season value were tested against things the metric never sees: All-NBA and All-Star voting, and how much teams paid players on their second contracts. All three predict awards equally well (AUC ≈ 0.98–0.99). The VORP + Win Shares blend tracks contracts much better (Spearman 0.83 vs 0.63 for VORP alone). Plain VORP ranks a below-replacement player who keeps getting minutes *below* someone out of the league, while teams keep paying the former. A data-driven factor score didn't beat the simple blend, so the blend was kept (DECISIONS D016).
+
+### Tiers
+| Tier | Best 3-season value | Calibrated to |
+|---|---|---|
+| Out of league | < 0.01 | no positive NBA value |
+| Bust | 0.01–0.32 | in the league, never a rotation player |
+| Rotation | 0.32–1.01 | 1,000+ minutes a season |
+| Starter | 1.01–1.76 | half the games started, 1,800+ minutes |
+| All-Star | 1.76–2.37 | All-Star selection |
+| All-NBA | ≥ 2.37 | All-NBA selection |
+
+Tiers describe how a player *played*, not how he was voted (67% exact agreement with the award and role anchors, 97% within one tier).
+
+![Tiers by pick](reports/phase2/tiers_by_pick.png)
+
+For the 1996–2016 drafts, 37% of top-5 picks reached All-NBA level, versus 13% for picks 6–14 and 4% for picks 15–30. Among second-rounders, 56% never established an NBA career, yet 10% became starters or better.
+
+### Career length (survival analysis)
+Many careers from recent drafts are still going, so their length is only a lower bound. Kaplan–Meier curves use those *censored* careers correctly instead of treating them as short.
+
+![Survival by pick](reports/phase2/career_survival_by_pick.png)
+
+Median career length: 14 seasons for picks 1–5, 11 for 6–14, 8 for 15–30, and 3 for 31–60. A Cox model shows *when* draft position matters. During the rookie deal (seasons 1–4), each doubling of pick number (e.g. #10 → #20) **doubles** the yearly chance of a career ending (hazard ratio 2.07). After season 4 that drops to +16%, and age at draft matters more (+26% per year older). Teams give high picks extra chances early; once players reach their second contract, performance matters far more than draft slot.
+
+### Limits
+- The validation targets (awards, peak pay) favor peak performance, so they can't fully settle how much longevity should count. The 75/25 weighting is a judgment call, recorded in D016.
+- A career counts as "ended" when the player has missed two straight seasons, so a player on a long injury absence could be misclassified.

@@ -20,6 +20,8 @@ dependencies = [
     "unidecode>=1.4.0",
     "matplotlib>=3.11.2",
     "tabulate>=0.10.0",
+    "scikit-learn>=1.9.1",
+    "lifelines>=0.30.3",
 ]
 
 [project.scripts]
@@ -63,5 +65,5 @@ markers = [
 addopts = "-m 'not dq'"
 
 [[tool.mypy.overrides]]
-module = ["pandas.*", "nba_api.*", "cbbpy.*", "lifelines.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
+module = ["pandas.*", "nba_api.*", "cbbpy.*", "lifelines.*", "sklearn.*", "scipy.*", "lightgbm.*", "ngboost.*", "pymc.*", "shap.*"]
 ignore_missing_imports = true

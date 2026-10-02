@@ -212,3 +212,60 @@ def test_post_draft_college_seasons_are_flagged(con) -> None:
         WHERE p.drafted AND c.season > p.draft_year AND c.is_pre_draft""",
     )
     assert bad.empty, bad
+
+
+# --------------------------------------------------------------------- outcomes
+def test_outcomes_one_row_per_player_and_n(con) -> None:
+    assert (
+        scalar(
+            con,
+            """SELECT count(*) FROM (SELECT bbref_id, n FROM modeled.outcomes__outcomes_through_n
+            GROUP BY 1, 2 HAVING count(*) > 1)""",
+        )
+        == 0
+    )
+
+
+def test_cumulative_outcomes_never_decrease(con) -> None:
+    bad = q(
+        con,
+        """SELECT bbref_id, n FROM (
+            SELECT bbref_id, n, minutes - lag(minutes) OVER w AS d_min,
+                   seasons_in_nba - lag(seasons_in_nba) OVER w AS d_seasons,
+                   peak3_blend - lag(peak3_blend) OVER w AS d_peak
+            FROM modeled.outcomes__outcomes_through_n
+            WINDOW w AS (PARTITION BY bbref_id ORDER BY n))
+        WHERE d_min < 0 OR d_seasons < 0 OR d_peak < -1e-9""",
+    )
+    assert bad.empty, bad
+
+
+def test_composites_centered_on_training_classes_at_every_n(con) -> None:
+    # Same-point scale: at each N, training-class players average zero.
+    worst = scalar(
+        con,
+        """SELECT max(abs(m)) FROM (SELECT o.n, avg(o.composite_blend) m
+        FROM modeled.outcomes__outcomes_through_n o
+        JOIN modeled.core__players p USING (bbref_id)
+        WHERE p.draft_class_role = 'training' GROUP BY 1)""",
+    )
+    assert worst < 1e-6
+
+
+def test_tiers_ordered_by_peak_value(con) -> None:
+    t = q(
+        con,
+        """SELECT tier_idx, min(peak3_blend) lo, max(peak3_blend) hi
+        FROM modeled.outcomes__outcomes_through_n GROUP BY 1 ORDER BY 1""",
+    )
+    assert t["tier_idx"].tolist() == list(range(6))
+    assert (t["lo"].iloc[1:].to_numpy() >= t["hi"].iloc[:-1].to_numpy()).all()
+
+
+def test_censoring_rules(con) -> None:
+    c = q(con, "SELECT * FROM modeled.outcomes__careers")
+    never = c[c["seasons_played"] == 0]
+    assert (never["ended"] & (never["duration"] == 0)).all()
+    last_complete = get_settings().current_nba_season - 1
+    active = c[c["last_season"] >= last_complete - 1]
+    assert not active["ended"].any()

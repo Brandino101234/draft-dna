@@ -33,6 +33,7 @@ def run_bbref_league(settings: Settings | None = None) -> None:
     )
     write_table(bbref.ingest_player_index(f), "raw", "bbref", "player_index", s)
     write_table(bbref.ingest_league_averages(f, cur), "raw", "bbref", "league_averages", s)
+    write_table(bbref.ingest_salary_cap(f), "raw", "bbref", "salary_cap", s)
     for name, df in bbref.ingest_season_player_stats(f, nba_seasons(s), cur).items():
         write_table(df, "raw", "bbref", f"season_{name}", s)
     write_table(

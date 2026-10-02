@@ -186,7 +186,7 @@ def derive_rates(df: pd.DataFrame) -> pd.DataFrame:
         published = out[col] if col in out else pd.Series(pd.NA, index=out.index, dtype="Float64")
         out[f"{col}_source"] = published.notna().map({True: "published", False: "derived"})
         out.loc[published.isna() & out[f"{col}_derived"].isna(), f"{col}_source"] = pd.NA
-        out[col] = published.fillna(out[f"{col}_derived"])
+        out[col] = pd.to_numeric(published, errors="coerce").fillna(out[f"{col}_derived"])
     return out
 
 

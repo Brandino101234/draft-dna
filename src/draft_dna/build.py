@@ -9,6 +9,7 @@ from draft_dna.features import era
 from draft_dna.ingest.run import STEPS
 from draft_dna.logging_utils import get_logger
 from draft_dna.modeled import integrate
+from draft_dna.outcomes import run as outcomes
 from draft_dna.staging import bbref as stage_bbref
 from draft_dna.staging import other as stage_other
 
@@ -26,6 +27,8 @@ def transform(s: Settings | None = None) -> None:
     log.info("== modeled")
     era.run(s)
     integrate.run(s)
+    log.info("== outcomes")
+    outcomes.run(s)
     log.info("== duckdb")
     db.load(s)
 

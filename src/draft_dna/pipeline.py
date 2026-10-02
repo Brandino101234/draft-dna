@@ -59,10 +59,11 @@ def transform() -> None:
 
 @app.command()
 def report() -> None:
-    """Write data coverage reports to reports/phase1/."""
-    from draft_dna.eval import coverage
+    """Write reports: data coverage (phase 1) and outcome definitions (phase 2)."""
+    from draft_dna.eval import coverage, outcomes_report
 
     coverage.run()
+    outcomes_report.run()
 
 
 @app.command()
