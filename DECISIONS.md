@@ -274,3 +274,21 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 **Cards** are rendered on demand in the cloud (about 0.2 s each) instead of committing 39 MB of PNGs that would be re-committed on every refresh.
 
 **Dependencies:** the app installs only `app/requirements.txt` (no LightGBM, PyMC or scraping stack). The few helpers cards need moved into lightweight modules (`outcomes.tiers.tier_cuts`, `tier_probabilities`, `eval.metrics.QCOLS`).
+
+### D033: Grades count playoffs and accolades; every pick since 1996 is graded
+
+**Problem:** the grade compared a regular-season-only peak (Phase 2 blend of VORP and Win Shares) to the draft-night range. Jaylen Brown (#3, 2016; Finals MVP, All-NBA 2023) got a C: his regular-season peak through year 8 (1.64) sat just below the #3-pick median (1.74).
+
+**Change (grading only; Phase 2–6 results keep the original measure):**
+- **Playoff value:** each season adds playoff VORP and Win Shares on the regular-season z scale, with no shift (no playoffs = 0). Counting stats mean deep runs add more.
+- **Accolade floor:** once a player has an All-Star selection, his graded peak is at least the All-Star tier cutoff (1.76). All-NBA raises it to the All-NBA cutoff (2.37). This matches how tiers were defined in D017.
+- **Refit on the same measure:** draft-night projections, the measurement model and calibration are all refit on this graded peak, so letters keep their meaning (as-of finished careers: A 9% / B 37% / C 29% / D 25%, unchanged).
+- **Effects:** Brown C→B, Murray C→B, Tatum B→A. Busts (Bennett, Fultz, Kwame Brown, Darko) stay D.
+- **Alternatives rejected:** looser letter bands (A ≥ 80th pct, D < 15th) made 19% A and 7% D and lifted Fultz to C. They hide real misses.
+
+**Retrospective projections (1996–2004):** these classes have fewer than 100 earlier players with year-8 outcomes, so there's no honest as-of projection.
+- **How they're built:** the same draft-slot model, fit on all *other* classes.
+- **How they're marked:** labeled "retrospective" in the app and on cards, and excluded from calibration and validation.
+- **Caveat:** they skew to D (40%) because early-era second-rounders washed out more often than the later drafts the model learned from.
+
+**Known limit:** high-school and international prospects have few pre-draft stats, so their *comps* rest mostly on age, size and pick. Comps for LeBron show similarity 100 with Kwame Brown and Tyson Chandler, which is technically matched but not informative.

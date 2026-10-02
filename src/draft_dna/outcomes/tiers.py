@@ -79,3 +79,13 @@ def tier_probabilities(q: np.ndarray, cuts: list[float]) -> np.ndarray:
     cdf = np.column_stack([M.cdf_at(q, c) for c in cuts])
     edges = np.column_stack([np.zeros(len(q)), cdf, np.ones(len(q))])
     return np.clip(np.diff(edges, axis=1), 0, 1)
+
+
+def graded_peak(otn: pd.DataFrame, cuts: list[float]) -> pd.Series:
+    """Best 3-season value incl. playoffs, floored by accolades earned through N."""
+    floor = np.select(
+        [otn["all_nba_selections"] >= 1, otn["all_star_selections"] >= 1],
+        [cuts[4], cuts[3]],  # All-NBA and All-Star tier cutoffs
+        -np.inf,
+    )
+    return pd.Series(np.maximum(otn["peak3_graded"].to_numpy(dtype=float), floor), otn.index)

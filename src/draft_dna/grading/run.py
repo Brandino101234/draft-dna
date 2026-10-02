@@ -1,4 +1,12 @@
-"""Grade every drafted player (2002+) from the draft-night projection and seasons played.
+"""Grade every drafted player from the draft-night projection and seasons played.
+
+The graded outcome is the best 3-season stretch of value *including playoff value*, with
+accolade floors: an All-Star selection guarantees at least an All-Star-tier peak, All-NBA
+at least an All-NBA-tier peak (D033). Projections are refit on that same measure.
+
+Classes before 2005 have too little earlier history for an as-of-draft-night projection;
+they get a *retrospective* projection (draft-slot model fit on all other classes), shown
+on cards but never used for calibration or validation.
 
 Outputs modeled.grading__grades: status, seasons played, prior and posterior summaries of
 the year-8 peak, grade letter, confidence, Year-4 Verdict and Career Grade (Phase 6
@@ -17,21 +25,27 @@ from draft_dna.eval.phase3 import pick_conformal
 from draft_dna.grading import bayes as B
 from draft_dna.ingest.storage import read_table, write_table
 from draft_dna.logging_utils import get_logger
+from draft_dna.outcomes.tiers import graded_peak, tier_cuts
 
 log = get_logger(__name__)
 
-FIRST_GRADED_CLASS = 2005  # needs >= 100 classes' worth of year-8 history before it
+MIN_TRAINING = 100  # an as-of projection needs this many earlier players with outcomes
 QCOLS = M.QCOLS
 
 
 def peaks_wide(s: Settings) -> pd.DataFrame:
     otn = read_table("modeled", "outcomes", "outcomes_through_n", s)
-    return otn.pivot(index="bbref_id", columns="n", values="peak3_blend")
+    otn["peak"] = graded_peak(otn, tier_cuts(s))
+    return otn.pivot(index="bbref_id", columns="n", values="peak")
 
 
-def asof_prior_grids(s: Settings, horizon: int = B.FINAL_N) -> pd.DataFrame:
+def asof_prior_grids(
+    s: Settings, horizon: int = B.FINAL_N, retrospective: bool = False
+) -> pd.DataFrame:
     """Draft-night projected quantile grid of the year-`horizon` peak for every drafted
-    player (model of record; class c trains Y only if c + horizon <= Y)."""
+    player (model of record; class c trains Y only if c + horizon <= Y). With
+    `retrospective`, classes lacking that much history are projected from all other
+    classes instead (flagged in the `retrospective` column)."""
     df = bt.modeling_frame(s)
     wide = peaks_wide(s)
     df["y_final"] = df["bbref_id"].map(wide[horizon]) if horizon in wide else np.nan
@@ -39,13 +53,20 @@ def asof_prior_grids(s: Settings, horizon: int = B.FINAL_N) -> pd.DataFrame:
     rows = []
     for year in sorted(df["draft_year"].dropna().unique().astype(int)):
         train = known[known["draft_year"] + horizon <= year]
-        if len(train) < 100:
-            continue
+        retro = len(train) < MIN_TRAINING
+        if retro:
+            if not retrospective:
+                continue
+            train = known[known["draft_year"] != year]
         cls = df[df["draft_year"] == year]
         q = M.monotone(
             pick_conformal().fit(train, train["y_final"].to_numpy()).predict_quantiles(cls)
         )
-        rows.append(pd.DataFrame(q, columns=QCOLS).assign(bbref_id=cls["bbref_id"].to_numpy()))
+        rows.append(
+            pd.DataFrame(q, columns=QCOLS).assign(
+                bbref_id=cls["bbref_id"].to_numpy(), retrospective=retro
+            )
+        )
     return pd.concat(rows, ignore_index=True).set_index("bbref_id")
 
 
@@ -70,10 +91,10 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     if meas is None:
         drafted = wide[wide.index.map(players["drafted"]).fillna(False).astype(bool)]
         meas = B.fit_measurement(drafted)
-    all_priors = asof_prior_grids(s)
-    history = wide.dropna(subset=[B.FINAL_N]).index
-    zcal = calibration(wide, all_priors, meas, history)
-    priors = all_priors[all_priors.index.map(players["draft_year"]) >= FIRST_GRADED_CLASS]
+    priors = asof_prior_grids(s, retrospective=True)
+    honest = priors.index[~priors["retrospective"].astype(bool)]
+    history = wide.dropna(subset=[B.FINAL_N]).index.intersection(honest)
+    zcal = calibration(wide, priors, meas, history)
     grid = priors[QCOLS].to_numpy()
     m0, s0 = B.prior_from_grid(grid)
 
@@ -81,6 +102,9 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     out["player_name"] = out.index.map(players["player_name"])
     out["draft_year"] = out.index.map(players["draft_year"]).astype(int)
     out["pick"] = out.index.map(players["pick_overall"])
+    out["projection_type"] = np.where(
+        priors["retrospective"].astype(bool), "retrospective", "as of draft night"
+    )
     out["seasons"] = (last_complete - out["draft_year"]).clip(lower=0, upper=B.FINAL_N)
     out["retired"] = out.index.map(careers["ended"]).fillna(False).astype(bool)
     out["status"] = [

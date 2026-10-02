@@ -43,7 +43,11 @@ TABLES: list[tuple[str, str, list[str] | None]] = [
         ],
     ),
     ("features", "predraft", ["bbref_id", "age_at_draft", "height_in", "position"]),
-    ("outcomes", "outcomes_through_n", ["bbref_id", "n", "peak3_blend"]),
+    (
+        "outcomes",
+        "outcomes_through_n",
+        ["bbref_id", "n", "peak3_graded", "all_star_selections", "all_nba_selections"],
+    ),
 ]
 
 
