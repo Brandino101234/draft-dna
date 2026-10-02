@@ -310,3 +310,23 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 **Plain-language summaries:** grades carry the tier of the median and P(All-Star or better), both now and on draft night, computed from the same quantile grids. The app leads with these instead of raw peak values.
 
 **Comps for limited-data prospects:** high-school and pro-team prospects (`prospect_source`) have comps based mostly on age, size and position. The app and cards say so and hide the similarity score, which overstates the match (LeBron–Kwame Brown at 100).
+
+### D035: Pre-registered: were high-school recruiting rankings over- or underrated by teams? (written before running)
+
+**Question:** given where a player was drafted, does his high-school recruiting rank (RSCI top 100, from Basketball-Reference bios) say anything about how his career turned out? If top recruits beat their draft slot on average, teams *underrated* them on draft night. If they fall short, teams *overrated* them.
+
+**Population:** drafted college players with an as-of draft-night projection (classes 2005+), excluding high-school and pro-team prospects.
+- RSCI covers these players' high-school classes, so a missing rank means "not a top-100 recruit", not missing data.
+
+**Outcome:** PIT of the graded peak (D033/D034) within the as-of draft-night range for the same horizon. PIT = where the career landed in the range expected for his slot: 0.5 = as expected, above = beat the slot.
+- **Primary:** year 4, classes 2005–2021 (all have 4 seasons).
+- **Secondary:** year 8, classes 2005–2017.
+
+**Groups:** RSCI 1–10, 11–25, 26–50, 51–100, unranked.
+
+**Tests:**
+- **Primary:** Spearman correlation between recruit group (ordinal, unranked last) and year-4 PIT, two-sided, α = 0.05.
+- **Per group:** mean PIT with 95% bootstrap CIs (2,000 resamples); a group "differs from its slot" only if its CI excludes 0.5.
+- **Robustness:** same at year 8, and within the first round only (second-round slots are noisier).
+
+**Interpretation rule:** a positive finding needs the primary test significant *and* the year-8 direction agreeing. Otherwise it's reported as no detectable mis-valuation. Draft slot already absorbs most of what recruiting rank says (Phase 3 used recruit rank as a feature and couldn't beat slot), so a null is the likely outcome.
