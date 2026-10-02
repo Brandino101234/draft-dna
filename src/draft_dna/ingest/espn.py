@@ -100,6 +100,8 @@ def game_shots(fetcher: Fetcher, game_id: int) -> tuple[pd.DataFrame, pd.DataFra
         for stat in team.get("statistics", []) or []:
             for a in stat.get("athletes", []) or []:
                 ath = a.get("athlete", {})
+                if not ath.get("id"):  # occasional placeholder rows ("Team", unnamed)
+                    continue
                 roster.append({"game_id": game_id, "team_id": tid, "athlete_id": int(ath["id"]),
                                "athlete_name": ath.get("displayName")})  # fmt: skip
     header = (g.get("header") or {}).get("competitions", [{}])[0]

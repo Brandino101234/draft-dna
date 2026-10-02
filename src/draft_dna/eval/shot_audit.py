@@ -222,3 +222,94 @@ def full_pull_estimate(s: Settings) -> dict[str, float]:
 
 def sample_exists(s: Settings) -> bool:
     return table_path("raw", "espn", "audit_shots", s).exists()
+
+
+def report(s: Settings) -> dict[str, object]:
+    """Write reports/phase4/shot_audit.md and coverage charts; return headline numbers."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    surface, text, text2, grid = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3de"
+    a = analyze(s)
+    bs = a["by_season"]
+    out = s.paths.reports / "phase4"
+    out.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(9.5, 4.6), facecolor=surface)
+    series = [
+        ("pbp", "Games with play-by-play", "#2a78d6"),
+        ("fga_typed", "Shots with a shot type", "#eb6834"),
+        ("fga_with_xy", "Shots with x/y coordinates", "#1baf7a"),
+    ]
+    for col, label, color in series:
+        ax.plot(bs["season"], bs[col], color=color, linewidth=2, marker="o", markersize=4)
+        ax.text(
+            bs["season"].iloc[-1] + 0.3,
+            bs[col].iloc[-1],
+            label,
+            color=text,
+            fontsize=9,
+            va="center",
+        )
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks(np.linspace(0, 1, 6), [f"{v:.0%}" for v in np.linspace(0, 1, 6)])
+    ax.set_xlim(bs["season"].min() - 0.5, bs["season"].max() + 6.5)
+    ax.set_facecolor(surface)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color(grid)
+    ax.grid(axis="y", color=grid, linewidth=0.8)
+    ax.tick_params(colors=text2, labelsize=9, length=0)
+    ax.set_xlabel("College season (ending year)", fontsize=9, color=text2)
+    ax.set_title(
+        "College shot data coverage (ESPN play-by-play)",
+        loc="left",
+        fontsize=13,
+        color=text,
+        pad=10,
+    )
+    fig.text(
+        0.01,
+        -0.02,
+        f"Sample: up to {SAMPLE_TEAMS} drafted-player team-seasons x "
+        f"{SAMPLE_GAMES} games per season; shares are of the sampled team's field-goal "
+        "attempts.",
+        fontsize=8,
+        color=text2,
+    )
+    fig.tight_layout()
+    fig.savefig(
+        out / "shot_coverage_by_season.png", dpi=150, facecolor=surface, bbox_inches="tight"
+    )
+    plt.close(fig)
+
+    pl = a["players"]
+    pl = pl[pl["sample_fga"] >= 20]
+    est = full_pull_estimate(s)
+    md = [
+        "# Phase 4a: college shot-data audit\n",
+        "## Coverage by season\n",
+        bs.round(3).to_markdown(index=False),
+        "\n## Coordinate coverage by conference (games with play-by-play)\n",
+        a["by_conf"].head(15).round(3).to_markdown(index=False),
+        "\n## Coordinates vs televised games (2015+)\n",
+        a["by_tv"].round(3).to_markdown(index=False),
+        "\n## Shot-type mix by season\n",
+        a["kinds"].round(3).to_markdown(index=False),
+        "\n## Drafted players in the sample (>= 20 sampled FGA)\n",
+        f"{len(pl)} player-seasons; share of their FGA with coordinates: "
+        f"median {pl['xy_share'].median():.0%}, "
+        f">= 50% for {(pl['xy_share'] >= 0.5).mean():.0%} of them.\n",
+        "\n## Full pull estimate\n",
+        pd.Series(est).to_frame("value").to_markdown(),
+    ]
+    (out / "shot_audit.md").write_text("\n".join(md) + "\n")
+    return {
+        "by_season": bs,
+        "players": pl,
+        "estimate": est,
+        "by_conf": a["by_conf"],
+        "by_tv": a["by_tv"],
+    }
