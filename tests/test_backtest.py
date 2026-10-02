@@ -121,10 +121,12 @@ def test_stats_knn_does_not_pick_hub_players_with_missing_data() -> None:
     train = pd.DataFrame(
         {
             "bbref_id": ["full_near", "full_far", "hub"],
-            "a": [1.0, 5.0, np.nan], "b": [1.0, 5.0, np.nan],
-            "c": [1.0, 5.0, np.nan], "d": [1.0, 5.0, 1.2],
+            "a": [1.0, 5.0, np.nan],
+            "b": [1.0, 5.0, np.nan],
+            "c": [1.0, 5.0, np.nan],
+            "d": [1.0, 5.0, 1.2],
         }
-    )  # fmt: skip
+    )
     test = pd.DataFrame({"bbref_id": ["x"], "a": [1.1], "b": [0.9], "c": [1.0], "d": [1.2]})
     m = StatsKnn(k=2, features=feats).fit(train, np.zeros(3))
     idx, _ = m.neighbors(test)
@@ -152,3 +154,24 @@ def test_guardrail_blocks_comps_of_different_size_or_position() -> None:
     idx, _ = m.neighbors(test)
     # Identical shot profile, but the 6'11" big is not an eligible comp for a 6'2" guard.
     assert list(train.iloc[idx[0]]["bbref_id"]) == ["guard_near", "guard_far"]
+
+
+def test_spatial_model_fills_style_weights_only_for_players_with_maps() -> None:
+    from draft_dna.eval.phase5 import STYLE_K, SpatialLgbm
+    from draft_dna.features import shot_xy
+
+    rng = np.random.default_rng(0)
+    n_cells = len(shot_xy.GRID_X) * len(shot_xy.GRID_Y)
+    maps = pd.DataFrame(
+        rng.random((30, n_cells)),
+        index=[f"p{i}" for i in range(30)],
+        columns=[f"c{i}" for i in range(n_cells)],
+    )
+    m = SpatialLgbm(maps)
+    m.nmf = shot_xy.fit_styles(maps, k=STYLE_K)
+    df = pd.DataFrame({"bbref_id": ["p0", "p1", "no_map"]})
+    f = m._features(df)
+    styles = f[[f"style_{i}" for i in range(STYLE_K)]]
+    assert styles.iloc[:2].notna().all().all()  # players with maps get weights
+    assert styles.iloc[2].isna().all()  # and players without a map stay missing
+    assert np.allclose(styles.iloc[:2].sum(axis=1), 1.0)

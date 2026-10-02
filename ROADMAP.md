@@ -46,9 +46,11 @@
 - [x] NBA early-career shot charts (for Phase 7 "plays like")
 
 ## Phase 5: Does shot data help? (`phase-5-shot-vs-stats`)
-- [ ] Pre-registered comparison in DECISIONS.md
-- [ ] Stats-only vs shot-only vs combined backtest, with CIs
-- [ ] Results by position and archetype
+- [x] Pre-registered comparison in DECISIONS (D027, committed before any model ran)
+- [x] Stats-only vs shot-only vs combined backtest (comps with tuned blend weight + LightGBM), with CIs
+- [x] Results by position and pick band; tier-B shot-location test
+- [x] Result: no detectable added value (D028); rim finishing flagged for confirmation on 2023+ classes (D029)
+- [ ] Run the D029 confirmation test as 2023-2026 classes reach year 4
 
 ## Phase 6: Who beats their projection (`phase-6-over-under`)
 - [ ] Beat-ceiling / miss-floor rates by segment

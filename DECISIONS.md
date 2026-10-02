@@ -143,3 +143,59 @@ Decision (user, after review): two-tier design (D026).
 **Comps guardrail:** shot-based comps must be within 3 inches of height and share the position bucket (`GuardedKnn`).
 
 **NBA shot charts:** stats.nba.com shot charts for each player's first 4 NBA seasons (2.24M shots, 2,424 players) are standardized into the same frame for Phase 7's "plays like" comps. stats.nba.com throttles sustained pulls, so it is accessed at 3.5 s/request with retries, and any player-season that keeps failing is skipped.
+
+### D027: Phase 5 pre-registration (written and committed before any Phase 5 model was run)
+**Question.** Does *how* a prospect scores (Shot DNA) predict NBA success better than box-score stats, and does it add anything beyond draft position?
+
+**Cohort.** Drafted college players with ≥100 shot-type field-goal attempts (Barttorvik splits, available from the 2010 class). Every model is trained and tested on this cohort only, so the comparison is identical across models.
+
+**Design B (primary, user choice).** Target = best 3-season value through year 4 (`y_peak4`). Strict leakage rule: class c trains test year Y only if c + 4 ≤ Y (outcome known by draft night). Test years 2014–2022 (~417 players).
+
+**Design A (sensitivity check).** Target = year-6 peak (`y_peak6`). Train on classes drafted before Y (c < Y), even though their 6-year outcomes complete later. Test years 2012–2020. It uses information that was not available on draft night, so it is a robustness check only.
+
+**Feature sets.**
+- `stats`: Phase 3 pre-draft stats, age, size, combine
+- `shot`: tier-A Shot DNA (rim/mid/three mix, dunk share, era-relative 3PA rate, EB zone FG% and their era-relative versions, assisted shares by type, unassisted share)
+- `stats+shot`
+
+**Models** (hyperparameters frozen from Phase 3; nothing tuned except where stated):
+1. Pick only + conformal (Phase 3 model of record; baseline a)
+2. kNN comps on `stats` (baseline b), on `shot` (size/position guardrail), and on `stats+shot`, where the combined distance is w·d_stats + (1−w)·d_shot, with w ∈ {0, 0.25, 0.5, 0.75, 1} chosen on test years 2014–2017 and reported on 2018–2022
+3. LightGBM quantile (Phase 3 config) on `stats`, `shot`, `stats+shot` without pick
+4. LightGBM quantile on pick + `stats`, pick + `shot`, pick + `stats+shot`
+
+**Pre-registered comparisons** (CRPS; 95% paired bootstrap CI over players):
+- **H1, beyond draft position:** LightGBM pick + `stats+shot` vs pick + `stats`
+- **H2, how vs how much:** LightGBM `shot` vs `stats` vs `stats+shot` (no pick)
+- **H3, the bar:** the best shot-informed model vs pick only + conformal
+- **Secondary metrics:** pinball loss (floor, median, ceiling), Brier score for P(bust) and P(All-Star level), coverage
+- **Subgroups (descriptive, with CIs):** position (guard / forward / big) and pick band (1–14, 15–30, 31–60)
+- **Tier-B spatial test (exploratory):** coordinate-eligible subset, adding zone shares and NMF style weights (NMF refit inside each fold) to pick + `stats`
+
+**Decision rule.** Shot data "helps" only if a model's CRPS beats its no-shot counterpart with a 95% CI that excludes zero under design B. The model of record changes only if a shot-informed model also beats pick only + conformal that way. Results are reported whether positive, null or negative.
+
+### D028: Phase 5 results: shot data does not add detectable predictive value
+All comparisons as pre-registered in D027 (CRPS difference, 95% paired bootstrap CI; negative = better):
+
+| comparison | Design B (primary, strict, year 4) | Design A (check, year 6) |
+|---|---|---|
+| H1: pick + stats + shot vs pick + stats | −0.0001 (−0.0016, +0.0013) no difference | +0.0009 (−0.0014, +0.0032) no difference |
+| H2a: shot vs stats (no pick) | +0.0154 (+0.0042, +0.0267) **worse** | +0.0261 (+0.0098, +0.0419) **worse** |
+| H2b: stats + shot vs stats (no pick) | −0.0006 (−0.0023, +0.0010) no difference | −0.0005 (−0.0029, +0.0018) no difference |
+| H2c: kNN shot vs kNN stats | +0.0164 (+0.0083, +0.0246) **worse** | +0.0200 (+0.0100, +0.0301) **worse** |
+| H3: pick + stats + shot vs pick only | +0.0013 (−0.0066, +0.0092) tie | +0.0096 (+0.0004, +0.0185) worse |
+| Tier B: pick + stats + location vs pick + stats (coordinate subset) | +0.0017 (−0.0005, +0.0038) no difference | +0.0018 (−0.0007, +0.0044) no difference |
+
+- **Comp blend weight:** chosen on tuning years, it is 100% stats / 0% shot in both designs.
+- **Subgroups:** none of the 24 subgroup intervals (position × pick band × design) excludes zero.
+- **Conclusion:** within this cohort (~415 drafted college players, 2010+), *how* a prospect scores, measured by shot type, assisted rate or shot location, adds no detectable information beyond draft position plus box-score stats. On its own it is a weaker signal than box-score stats. The intervals on H1 are narrow (about ±0.0015 CRPS, ~0.5% of the score), so any real effect is very small. The model of record is unchanged (D021).
+- **Why plausible:** shot profile is largely downstream of things box scores and scouts already capture (size, athleticism, role). Scoring *volume* and *efficiency* matter; *where* the shots come from adds little once those are known.
+
+### D029: Exploratory signal (rim finishing) and its pre-registered confirmation test
+Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim FG% (relative to the D-I average) is the one with signal beyond out-of-sample pick + stats predictions (Spearman ρ = 0.14, p = 0.0032, n = 414, vs. a multiple-comparison threshold of 0.0033). The pre-registered model, given all 15 shot features, did not turn it into better forecasts, plausibly because 14 weak features diluted it.
+**Confirmation test (fixed now, run when data exists):**
+- **Cohort:** drafted college players from the 2023–2026 classes, never used in any Phase 5 analysis.
+- **When:** as each class's year-4 outcome completes (2023 class: after the 2026-27 season).
+- **Test 1:** Spearman ρ between `rim_fg_eb_rel` and the residual of a LightGBM pick + stats model trained only on classes ≤ 2022.
+- **Test 2:** CRPS of LightGBM pick + stats + `rim_fg_eb_rel` vs pick + stats.
+- **Confirmation requires:** ρ > 0 with a 95% CI excluding zero *and* a CRPS improvement whose 95% CI excludes zero. Otherwise the signal is treated as noise.

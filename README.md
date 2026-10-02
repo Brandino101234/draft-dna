@@ -190,3 +190,33 @@ Each eligible player's shots become a smoothed heat map. Non-negative matrix fac
 A style mix is a *shape* description, not a shot count. Trae Young's diffuse deep threes carry less weight than his concentrated rim attempts. For "% of shots from X," use the shot-type numbers: Trae took 53% of his shots from three, and only 11% of his rim makes were assisted (versus 49% for Zion).
 
 The test of whether any of this predicts NBA success beyond draft position is Phase 5.
+
+## Phase 5: Does *how* a prospect scores predict NBA success?
+
+**The headline question.** Phase 3 found that college box-score stats don't beat draft position. Does shot data (where and how a prospect scores) add what box scores miss?
+
+**Method.** The full analysis plan was written and committed before any model ran ([DECISIONS D027](DECISIONS.md)).
+- **Cohort:** every model sees the same ~415 drafted college players from 2010 on with shot data.
+- **Primary design (B):** fully leak-free. Careers are judged at year 4, and a model trains only on classes whose year-4 outcomes were known by draft night.
+- **Sensitivity check (A):** year-6 outcomes and more training data, at the cost of using outcomes not yet known on draft night.
+- **Models:** stats-only, shot-only and combined versions of both comps and LightGBM, each with and without the draft pick. The comps' stats/shot blend weight was tuned on early years only.
+
+![Pre-registered comparisons](reports/phase5/preregistered_comparisons.png)
+
+**Finding: no. Shot data added no detectable predictive value, in either design.**
+- **Beyond pick + stats:** adding shot type, assisted rate and shot mix changed forecast error by −0.0001 (95% CI −0.0016 to +0.0013). That interval is narrow enough to rule out anything but a tiny effect.
+- **On its own:** shot data is a *weaker* signal than box-score stats (+0.015 worse for models, +0.016 for comps). When the comp blend was tuned, it gave shot data zero weight.
+- **Shot location:** on the 157–215 players with coordinates, adding zone shares and the six NMF shot styles didn't help either.
+- **Subgroups:** none of the 24 position × pick-band subgroups showed a detectable effect.
+- **Draft position:** nothing beat it. It remains the model of record.
+
+The most plausible reading: a prospect's shot profile is mostly *downstream* of things box scores and scouts already capture (size, athleticism, role). How much and how efficiently a player scores matters; where the shots come from adds little once those are known.
+
+![Exploratory signal](reports/phase5/exploratory_shot_signal.png)
+
+**One lead worth following (exploratory, not confirmed).** Of 15 shot traits, only **rim finishing** (shrunken rim FG% relative to the Division I average) still correlates with outcomes after removing what pick + stats predict (ρ = 0.14, p = 0.0032). That's right at the multiple-testing threshold, so it's a hypothesis, not a finding. A confirmation test is pre-registered ([D029](DECISIONS.md)) on the 2023–2026 classes, which no Phase 5 analysis has touched, to run as their year-4 outcomes arrive.
+
+**Limits:**
+- **Sample size:** shot data starts with the 2010 class, so the cohort is ~415 players. Effects smaller than about 0.5% of forecast error can't be detected.
+- **Coordinates:** location data covers the 2014+ classes and leans toward televised games.
+- **Outcome:** "success" means peak value by year 4 (primary) or year 6 (check). A trait that only pays off late in a career would be missed.
