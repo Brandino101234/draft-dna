@@ -1,7 +1,4 @@
-"""Command-line entry point: `draft-dna <command>`.
-
-Commands for later phases are stubs that exit with a clear message.
-"""
+"""Command-line entry point: `draft-dna <command>`."""
 
 from __future__ import annotations
 
@@ -100,6 +97,41 @@ def project() -> None:
 
 
 @app.command()
+def grade() -> None:
+    """Phase 7: grade every player and build trajectory bands, plays-like comps, style map."""
+    from draft_dna import db
+    from draft_dna.grading import extras
+    from draft_dna.grading import run as grading
+
+    s = get_settings()
+    grading.run(s)
+    extras.run(s)
+    db.load(s)
+
+
+SAMPLE_CARDS = ["dybanaj01", "peterda02", "boozeca02", "flaggco01", "wembavi01", "banchpa01"]
+
+
+@app.command()
+def cards(all_recent: bool = True) -> None:
+    """Phase 7: render prospect cards (2022-2026 classes) and refresh the sample cards."""
+    from draft_dna.ingest.storage import read_table
+    from draft_dna.viz import cards as card_viz
+
+    s = get_settings()
+    grades = read_table("modeled", "grading", "grades", s)
+    ids = grades.loc[grades["draft_year"] >= 2022, "bbref_id"].tolist() if all_recent else []
+    out = card_viz.render_many(s, ids, s.paths.modeled / "cards")
+    card_viz.render_many(s, SAMPLE_CARDS, s.paths.reports / "cards")
+    log.info(
+        "rendered %d cards to %s (+ %d samples in reports/cards)",
+        len(out),
+        s.paths.modeled / "cards",
+        len(SAMPLE_CARDS),
+    )
+
+
+@app.command()
 def build() -> None:
     """Ingest every source (cached pages are reused) and run all transforms."""
     from draft_dna.build import build_all
@@ -108,14 +140,36 @@ def build() -> None:
 
 
 @app.command()
-def refresh() -> None:
-    """Pull new games and regrade players during the season. Phase 7."""
-    raise typer.Exit(_not_yet("refresh", 7))
+def refresh(skip_ingest: bool = False) -> None:
+    """In-season update: re-pull current-season pages, rebuild tables, regrade, redraw cards.
 
+    Only pages for the season in progress are re-fetched (older pages are cached forever),
+    so this makes a handful of requests. Draft-night projections never change.
+    """
+    from draft_dna.build import transform as run_transform
+    from draft_dna.grading import tracker
 
-def _not_yet(command: str, phase: int) -> int:
-    log.error("`%s` is implemented in Phase %d.", command, phase)
-    return 1
+    if not skip_ingest:
+        log.info("== ingest bbref-league (current season only re-fetched)")
+        STEPS["bbref-league"]()
+    run_transform()
+    grade()
+    cards()
+    s = get_settings()
+    t = tracker.rookie_tracker(s)
+    counts = t["status"].value_counts().to_dict()
+    log.info("%d class tracker: %s", s.draft_classes.live[-1], counts)
+    movers = t[t["status"].str.startswith("pacing")].head(10)
+    for _, r in movers.iterrows():
+        log.info(
+            "  #%d %s: pace %.2f vs range %.2f-%.2f (%s)",
+            int(r["pick"]),
+            r["player_name"],
+            r["value_pace"],
+            r["projected_floor"],
+            r["projected_ceiling"],
+            r["status"],
+        )
 
 
 if __name__ == "__main__":

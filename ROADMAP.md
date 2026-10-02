@@ -60,9 +60,9 @@
 - [x] Year-4 Verdict -> Career Grade overturn rate (14%)
 
 ## Phase 7: Cards and app (`phase-7-app`)
-- [ ] Grading state machine with Bayesian updating
-- [ ] Prospect cards (PNG export)
-- [ ] NBA "plays like" style comps (stylistic only)
-- [ ] Streamlit app: search, cards, compare, style map, 2026 tracker
-- [ ] `make refresh` for in-season updates
-- [ ] Final README writeup
+- [x] Grading state machine with Bayesian updating
+- [x] Prospect cards (PNG export)
+- [x] NBA "plays like" style comps (stylistic only)
+- [x] Streamlit app: search, cards, compare, style map, 2026 tracker
+- [x] `make refresh` for in-season updates
+- [x] Final README writeup

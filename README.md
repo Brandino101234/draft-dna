@@ -1,10 +1,33 @@
 # Draft DNA
 
-NBA draft analytics: historical comps from pre-draft data, floor/median/ceiling projections, and season-by-season grading of players against those projections.
+**Question.** Can you predict an NBA prospect's career range from what's known on draft night, and does *how* a prospect scores (shot location and style) predict success better than traditional stats?
 
-**Headline question:** does *how* a prospect scores (shot location and style) predict NBA success better than traditional stats?
+**Short answer.** No, at least not detectably. Across 1,833 draft picks (1996–2026), draft position alone, honestly calibrated, is as good a forecast as anything built from college box scores, shot type or shot location. The project's real value is the honest uncertainty: every prospect gets a calibrated floor/median/ceiling, and that range tightens season by season as his NBA career unfolds.
 
-Work in progress. See [ROADMAP.md](ROADMAP.md) for status and [DECISIONS.md](DECISIONS.md) for every methodological choice.
+![AJ Dybantsa prospect card](reports/cards/dybanaj01.png)
+
+## Method
+- **No leakage.** Every forecast for draft class Y is built only from earlier classes and from outcomes observable by Y's draft night (rolling-origin backtests, one fold per draft year). Model choices were made on 2006–2012 and scored once on a 2013–2020 holdout.
+- **Baselines first.** Every model was compared to (a) draft-slot history and (b) stats-only comps. When a complex model didn't win, the simpler one shipped.
+- **Uncertainty everywhere.** Outputs are ranges and tier probabilities, calibrated with conformal prediction and checked by coverage (target: 25% below floor, 10% above ceiling).
+- **Same-point comparisons.** A player with N seasons is compared to his comps' first N seasons, never their full careers.
+- **Pre-registration.** The headline shot-data test was written and committed before any model ran ([D027](DECISIONS.md)).
+- **Outcome.** Season value = blend of VORP and Win Shares. A career is summarized by its best 3-season stretch, with tiers from Out of league to All-NBA (validated against awards and second-contract pay).
+
+## Findings
+1. **Draft position is the forecast to beat, and nothing beat it.** The best stats-based blend tied draft-slot history on the holdout (CRPS 0.331 vs 0.331). Stats-only comps were significantly worse. Calibrated draft-slot history is the model of record: 23.7% of players finished below the floor and 9.8% above the ceiling. ([Phase 3](#phase-3-comps-and-outcome-ranges-from-pre-draft-stats))
+2. **Shot data adds nothing detectable.** Adding shot type, assisted rate and shot mix changed forecast error by −0.0001 (95% CI −0.0016 to +0.0013). Shot location and NMF shot styles didn't help either. One exploratory lead, **rim finishing**, is pre-registered for confirmation on the 2023–2026 classes. ([Phase 5](#phase-5-does-how-a-prospect-scores-predict-nba-success))
+3. **Who beats their slot?** International and pro-team picks fall short (average PIT 0.40), and no franchise detectably develops players better than slot (p = 0.92). Size, passing and FT% predict early overperformance, but for college players that edge fades by year 6. ([Phase 6](#phase-6-who-beats-their-projection-and-why))
+4. **Year-4 verdicts hold up 86% of the time**, and when they're wrong they're usually too pessimistic (upgrades outnumber downgrades 3 to 1).
+5. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.39 on draft night to 0.03 by year 7. ([Phase 7](#phase-7-grades-cards-and-the-app))
+
+## Limitations
+- **Small n and few folds.** About 1,500 training picks; shot data covers about 415 players. Effects smaller than about 0.5% of forecast error can't be detected.
+- **Shot coordinates** exist only from 2014, and mostly for televised high-major games.
+- **No international, G League or injury histories.** "Missed games" mixes injury, demotion and coach's decisions.
+- **Situation effects are associations**, not causal estimates (E-values reported).
+- **Early grade floors are optimistic.** 35–38% of players finish below the year-1/2 floor (target 25%).
+- **"Plays like" comps are stylistic only** and say nothing about how good a player will be.
 
 ## Quickstart
 
@@ -12,11 +35,18 @@ Work in progress. See [ROADMAP.md](ROADMAP.md) for status and [DECISIONS.md](DEC
 make setup      # install environment (requires uv)
 make check      # lint, type check, unit tests
 make data       # download everything (first run: several hours, rate-limited) and build the database
-make transform  # rebuild staging -> modeled -> DuckDB from cached downloads (minutes)
+make models     # backtest models; build projections and comps
+make grade      # grades, trajectory bands, plays-like comps, prospect cards
+make app        # open the Streamlit app
+make refresh    # in-season: re-pull current-season pages, regrade, redraw cards (~3 min)
 make dq         # data-quality tests against the built database
 ```
 
-All raw data is rebuilt from scripts; nothing under `data/` is committed.
+All raw data is rebuilt from scripts; nothing under `data/` is committed. Every methodological choice is in [DECISIONS.md](DECISIONS.md); status is in [ROADMAP.md](ROADMAP.md).
+
+---
+
+# Detailed results by phase
 
 ## Phase 1: Data pipeline
 
@@ -258,3 +288,46 @@ Each player's draft-night projection gives a range. A **PIT score** says where h
 - **Causality:** situation effects are associations under stated assumptions, not causal estimates.
 - **Injuries:** there's no public injury history, so "missed games" mixes injury, G League stints and coach's decisions.
 - **Multiple comparisons:** segment comparisons span about 17 groups, so treat single borderline intervals as hypotheses.
+
+## Phase 7: Grades, cards and the app
+
+### Grading: from projection to career grade
+Every player starts with his draft-night range (the **prior**). Each NBA season is evidence about where his peak will land. A Bayesian update blends the two, giving more weight to observed play as seasons accumulate, and the error model is fit on history. The peak can never fall below what he has already reached.
+
+| Status | Seasons | Data weight (avg) |
+|---|---|---|
+| Projection | 0 | 0% |
+| Provisional (low confidence) | 1 | 35% |
+| Provisional (medium confidence) | 2–3 | 54–67% |
+| Year-4 Verdict | 4–7 | 79–99% |
+| Career Grade | 8+ or retired | final |
+
+**Grade:** where the current median sits in the draft-night range. **A** above the ceiling (90th percentile), **B** above the median, **C** above the floor, **D** below it. On finished careers, A/B/C/D = 10% / 37% / 29% / 25%.
+
+**Validation** on the held-out 2011–2018 classes (480 players):
+- Forecast error (CRPS) falls from 0.387 on draft night to 0.140 after 4 seasons and 0.025 after 7.
+- Calibrated ceilings are beaten 7–10% of the time (target 10%).
+- Floors run high early: 35–38% of players finish below them in years 1–2 and 24–30% later (target 25%).
+
+| Player | Status | Grade | Draft-night median | Now (floor – ceiling) |
+|---|---|---|---|---|
+| Victor Wembanyama | Provisional (medium) | A | 1.85 | 4.22 (3.51 – 6.03) |
+| Kon Knueppel | Provisional (low) | A | 1.76 | 3.75 (2.78 – 5.91) |
+| Cooper Flagg | Provisional (low) | B | 1.90 | 3.02 (2.16 – 4.98) |
+| Paolo Banchero | Year-4 Verdict | B | 1.85 | 2.18 (1.83 – 3.20) |
+
+### Prospect cards
+Each card shows the prospect's college shot map next to his top-3 comps' maps. It also shows his outcome range against the tier lines, tier probabilities, status, grade and confidence bar, and, for 2022–25 players, his path against the projected band. Samples: [Dybantsa](reports/cards/dybanaj01.png), [Peterson](reports/cards/peterda02.png), [Boozer](reports/cards/boozeca02.png), [Flagg](reports/cards/flaggco01.png), [Wembanyama](reports/cards/wembavi01.png), [Banchero](reports/cards/banchpa01.png).
+
+### "Plays like"
+NBA early-career shot maps are projected into the same six college shot styles. Each prospect gets the five nearest NBA players by style mix, within 3 inches of his height. This is a description of shot diet only: Phase 5 showed style doesn't predict success.
+
+### The app
+`make app` opens a Streamlit app with five pages:
+- **Player card:** search any graded player, with comps and plays-like tables
+- **Compare:** two players side by side
+- **Style map:** a 2D t-SNE layout of about 1,900 college and NBA shot styles
+- **2026 tracker:** each rookie's season-value pace against his draft-night range
+- **About:** this writeup
+
+`make refresh` updates the tracker and every grade during the season.

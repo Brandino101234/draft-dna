@@ -26,6 +26,8 @@ dependencies = [
     "ngboost>=0.5.11",
     "pymc>=6.3.2",
     "shap>=0.52.0",
+    "streamlit>=1.64.0",
+    "plotly>=7.1.0",
 ]
 
 [project.scripts]
@@ -74,5 +76,5 @@ ignore_missing_imports = true
 
 # Numerical code returns pandas/numpy values that mypy sees as Any (pandas is untyped, D011).
 [[tool.mypy.overrides]]
-module = ["draft_dna.eval.*", "draft_dna.models.*", "draft_dna.features.*", "draft_dna.outcomes.*"]
+module = ["draft_dna.eval.*", "draft_dna.models.*", "draft_dna.features.*", "draft_dna.outcomes.*", "draft_dna.grading.*"]
 warn_return_any = false

@@ -368,3 +368,56 @@ def test_projections_used_for_verdicts_are_well_calibrated_overall(con) -> None:
     p = q(con, "SELECT pit4, pit6, pit8 FROM modeled.phase6__player_outcomes_vs_projection")
     for col in p.columns:
         assert abs(p[col].mean() - 0.5) < 0.03, (col, p[col].mean())
+
+
+# ----------------------------------------------------------------------- phase 7
+def test_grades_ordered_and_consistent_with_status(con) -> None:
+    g = q(con, "SELECT * FROM modeled.grading__grades")
+    assert g["bbref_id"].is_unique
+    for kind in ("projected", "current"):
+        assert (g[f"{kind}_floor"] <= g[f"{kind}_median"] + 1e-9).all()
+        assert (g[f"{kind}_median"] <= g[f"{kind}_ceiling"] + 1e-9).all()
+    assert g["confidence"].between(0, 1).all()
+    assert (g.loc[g["status"] == "Projection", "grade"] == "-").all()
+    assert g.loc[g["status"] != "Projection", "grade"].isin(list("ABCD")).all()
+
+
+def test_grade_ranges_respect_peak_already_reached(con) -> None:
+    # A best-3-season value can't fall: the current floor is at least what he has reached.
+    d = q(
+        con,
+        """SELECT g.current_floor, o.peak3_blend
+           FROM modeled.grading__grades g
+           JOIN modeled.outcomes__outcomes_through_n o
+             ON o.bbref_id = g.bbref_id AND o.n = g.seasons
+           WHERE g.seasons > 0""",
+    )
+    assert len(d) > 500
+    assert (d["current_floor"] >= d["peak3_blend"] - 1e-6).all()
+
+
+def test_plays_like_excludes_self_and_respects_height(con) -> None:
+    d = q(
+        con,
+        """SELECT p.bbref_id, p.plays_like_id, a.height_in AS h1, b.height_in AS h2
+           FROM modeled.grading__plays_like p
+           LEFT JOIN modeled.features__predraft a ON a.bbref_id = p.bbref_id
+           LEFT JOIN modeled.features__predraft b ON b.bbref_id = p.plays_like_id""",
+    )
+    assert (d["bbref_id"] != d["plays_like_id"]).all()
+    both = d.dropna(subset=["h1", "h2"])
+    assert ((both["h1"] - both["h2"]).abs() <= 3.0).all()
+
+
+def test_rookie_tracker_covers_live_class() -> None:
+    from draft_dna.grading import tracker
+
+    s = get_settings()
+    t = tracker.rookie_tracker(s)
+    assert len(t) >= 58  # two rounds, minus forfeited picks
+    assert (t["projected_floor"] <= t["projected_ceiling"]).all()
+    assert (
+        t["status"]
+        .isin(["no games yet", "pacing above ceiling", "pacing below floor", "within range"])
+        .all()
+    )

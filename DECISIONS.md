@@ -240,3 +240,24 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
   - 23 are early overachievers who plateaued (beat ceiling at 4, within band at 8: Anthony Davis, Paul George, Deron Williams, Trae Young). They didn't decline; the projected ceiling for top picks rises through year 8.
   - Only 7 (0.8%) are true late busts (within band at 4, below floor at 8).
 - **Implication for the grading system (Phase 7):** a year-4 verdict is right ~86% of the time, and when it is wrong it is usually too pessimistic.
+
+### D031: Phase 7 grading model, cards and app
+
+**Grading (Bayesian updating).** On a square-root scale of year-8 peak value:
+- **Prior:** the draft-night projection, which is the model of record's quantile grid.
+- **Measurement model:** each season's observed peak-so-far is s(peak_N) = a_N + b_N·s(peak_8) + noise, fit on history.
+- **Posterior:** normal–normal, so the weight on the data grows each season (0.35 / 0.54 / 0.67 / 0.79 / 0.89 / 0.96 / 0.99 after 1–7 seasons).
+- **Calibration:** empirical residual quantiles in 5 bins of the posterior mean for each N, fit on classes ≤ 2010 and validated on the held-out 2011–18 classes (480 players).
+- **Rules:**
+  - A peak can never fall below the peak already reached.
+  - Grade = midpoint PIT of the posterior median vs the draft-night range: A ≥ 0.9, B ≥ 0.5, C ≥ 0.25, else D. On finished careers that gives A 9.6% / B 36.9% / C 28.6% / D 24.9%.
+  - Confidence = 1 − posterior sd / prior sd.
+
+**Validation:**
+- CRPS falls from 0.387 (draft night) to 0.025 (7 seasons).
+- Calibrated ceilings are exceeded 7–10% of the time (target 10%).
+- **Known limit:** floors run high in years 1–2 (35–38% finish strictly below, target 25%) and come closer at about 24–30% in years 3–7. Treat early floors as optimistic.
+
+**Plays-like comps:** NBA early-career shot maps (≥ 200 FGA) are projected onto the college NMF styles, with the 3-point line rescaled. Matches use cosine similarity and must be within 3 inches of height. They are **stylistic only**: Phase 5 found style has no predictive value. The "Rim attacker" style dominates the style map, so coarse labels hide a lot of variety.
+
+**Rookie tracker / refresh:** a rookie's projected range is 3 × the year-1 peak band. Pace = value-to-date × 82 / team games played. `draft-dna refresh` re-fetches only current-season pages (older pages are cached), then rebuilds, regrades and redraws cards. Draft-night projections never change.
