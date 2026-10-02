@@ -173,3 +173,29 @@ Decision (user, after review): two-tier design (D026).
 - **Tier-B spatial test (exploratory):** coordinate-eligible subset, adding zone shares and NMF style weights (NMF refit inside each fold) to pick + `stats`
 
 **Decision rule.** Shot data "helps" only if a model's CRPS beats its no-shot counterpart with a 95% CI that excludes zero under design B. The model of record changes only if a shot-informed model also beats pick only + conformal that way. Results are reported whether positive, null or negative.
+
+### D028: Phase 5 results: shot data does not add detectable predictive value
+All comparisons as pre-registered in D027 (CRPS difference, 95% paired bootstrap CI; negative = better):
+
+| comparison | Design B (primary, strict, year 4) | Design A (check, year 6) |
+|---|---|---|
+| H1: pick + stats + shot vs pick + stats | −0.0001 (−0.0016, +0.0013) no difference | +0.0009 (−0.0014, +0.0032) no difference |
+| H2a: shot vs stats (no pick) | +0.0154 (+0.0042, +0.0267) **worse** | +0.0261 (+0.0098, +0.0419) **worse** |
+| H2b: stats + shot vs stats (no pick) | −0.0006 (−0.0023, +0.0010) no difference | −0.0005 (−0.0029, +0.0018) no difference |
+| H2c: kNN shot vs kNN stats | +0.0164 (+0.0083, +0.0246) **worse** | +0.0200 (+0.0100, +0.0301) **worse** |
+| H3: pick + stats + shot vs pick only | +0.0013 (−0.0066, +0.0092) tie | +0.0096 (+0.0004, +0.0185) worse |
+| Tier B: pick + stats + location vs pick + stats (coordinate subset) | +0.0017 (−0.0005, +0.0038) no difference | +0.0018 (−0.0007, +0.0044) no difference |
+
+- **Comp blend weight:** chosen on tuning years, it is 100% stats / 0% shot in both designs.
+- **Subgroups:** none of the 24 subgroup intervals (position × pick band × design) excludes zero.
+- **Conclusion:** within this cohort (~415 drafted college players, 2010+), *how* a prospect scores, measured by shot type, assisted rate or shot location, adds no detectable information beyond draft position plus box-score stats. On its own it is a weaker signal than box-score stats. The intervals on H1 are narrow (about ±0.0015 CRPS, ~0.5% of the score), so any real effect is very small. The model of record is unchanged (D021).
+- **Why plausible:** shot profile is largely downstream of things box scores and scouts already capture (size, athleticism, role). Scoring *volume* and *efficiency* matter; *where* the shots come from adds little once those are known.
+
+### D029: Exploratory signal (rim finishing) and its pre-registered confirmation test
+Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim FG% (relative to the D-I average) is the one with signal beyond out-of-sample pick + stats predictions (Spearman ρ = 0.14, p = 0.0032, n = 414, vs. a multiple-comparison threshold of 0.0033). The pre-registered model, given all 15 shot features, did not turn it into better forecasts, plausibly because 14 weak features diluted it.
+**Confirmation test (fixed now, run when data exists):**
+- **Cohort:** drafted college players from the 2023–2026 classes, never used in any Phase 5 analysis.
+- **When:** as each class's year-4 outcome completes (2023 class: after the 2026-27 season).
+- **Test 1:** Spearman ρ between `rim_fg_eb_rel` and the residual of a LightGBM pick + stats model trained only on classes ≤ 2022.
+- **Test 2:** CRPS of LightGBM pick + stats + `rim_fg_eb_rel` vs pick + stats.
+- **Confirmation requires:** ρ > 0 with a 95% CI excluding zero *and* a CRPS improvement whose 95% CI excludes zero. Otherwise the signal is treated as noise.
