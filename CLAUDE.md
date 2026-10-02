@@ -34,6 +34,12 @@ Configured in `config/settings.yaml`. Don't hardcode years.
 ## Grading terms
 Projection (0 seasons) → Provisional-low (after Y1) → Provisional-medium (Y2–3) → **Year-4 Verdict** (not "Rookie Deal Verdict": 2nd-rounders aren't on 4-year deals) → Career Grade (Y8+ or retired).
 
+## Grading and app conventions (Phase 7)
+- Grades live in `modeled.grading__grades`, built by `draft-dna grade` (`grading/bayes.py` math, `grading/run.py` pipeline). Calibration is fit on classes <= 2010 only (D031).
+- Draft-night projections never change after the draft; `refresh` only adds seasons.
+- "Plays like" comps are stylistic only; never present them as outcome forecasts.
+- The app (`app/app.py`) only reads built tables; no modeling logic in the app.
+
 ## Data
 - Layers: `data/raw` (cached source responses, never re-fetched) → `data/staging` (typed, deduped) → `data/modeled` → DuckDB at `data/draft_dna.duckdb`. All gitignored and rebuilt with `make data`.
 - Rate limits in config. Sports-Reference must stay under 20 req/min. Always go through the shared cached fetcher, never call `requests` directly from an ingest module.

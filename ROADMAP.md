@@ -65,4 +65,4 @@
 - [x] NBA "plays like" style comps (stylistic only)
 - [x] Streamlit app: search, cards, compare, style map, 2026 tracker
 - [x] `make refresh` for in-season updates
-- [ ] Final README writeup
+- [x] Final README writeup
