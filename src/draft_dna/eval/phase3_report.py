@@ -90,7 +90,6 @@ def plot_model_comparison(tuning: pd.DataFrame, holdout: pd.DataFrame, path: Pat
                 zorder=3,
             )
         ax.axvline(0, color=TEXT_2, linewidth=1)
-        ax.text(0, -0.9, " pick only", fontsize=8, color=TEXT_2, va="center")
         ax.set_yticks(y, order, fontsize=9.5, color=TEXT)
         ax.set_title(title, loc="left", fontsize=10.5, color=TEXT)
         ax.set_xlabel("CRPS difference vs pick only  (left = better)", fontsize=9, color=TEXT_2)
