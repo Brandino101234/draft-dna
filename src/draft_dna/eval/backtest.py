@@ -61,22 +61,28 @@ def modeling_frame(s: Settings) -> pd.DataFrame:
 
 
 def folds(
-    df: pd.DataFrame, first: int = FIRST_TEST_YEAR, last: int | None = None
+    df: pd.DataFrame,
+    first: int = FIRST_TEST_YEAR,
+    last: int | None = None,
+    target: str = TARGET,
+    lag: int = HORIZON,
 ) -> Iterator[Fold]:
-    observed = df.loc[df[TARGET].notna(), "draft_year"]
+    """`lag` = how many years before Y a class must be to train year Y. The default
+    (= horizon) is the strict rule: its outcome must be known by draft night."""
+    observed = df.loc[df[target].notna(), "draft_year"]
     last = last or int(observed.max())
     for y in range(first, last + 1):
-        train = tuple(sorted(int(c) for c in observed.unique() if c + HORIZON <= y))
+        train = tuple(sorted(int(c) for c in observed.unique() if c + lag <= y))
         if train:
             yield Fold(y, train)
 
 
-def split(df: pd.DataFrame, fold: Fold) -> tuple[pd.DataFrame, pd.DataFrame]:
-    train = df[df["draft_year"].isin(fold.train_years) & df[TARGET].notna()]
-    test = df[(df["draft_year"] == fold.test_year) & df[TARGET].notna()]
-    assert train["draft_year"].max() + HORIZON <= fold.test_year, (
-        "leakage: outcome not yet observed"
-    )
+def split(
+    df: pd.DataFrame, fold: Fold, target: str = TARGET, lag: int = HORIZON
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train = df[df["draft_year"].isin(fold.train_years) & df[target].notna()]
+    test = df[(df["draft_year"] == fold.test_year) & df[target].notna()]
+    assert train["draft_year"].max() + lag <= fold.test_year, "leakage: outcome not yet observed"
     assert not set(train["bbref_id"]) & set(test["bbref_id"]), "leakage: player in both sets"
     return train, test
 
@@ -86,21 +92,21 @@ def run_backtest(
     make_model: Callable[[], QuantileModel],
     first: int = FIRST_TEST_YEAR,
     last: int | None = None,
+    target: str = TARGET,
+    lag: int = HORIZON,
 ) -> pd.DataFrame:
     """Out-of-sample quantile predictions for every test player, one fold per year."""
     rows = []
-    for fold in folds(df, first, last):
-        train, test = split(df, fold)
-        model = make_model().fit(train, train[TARGET].to_numpy())
+    for fold in folds(df, first, last, target, lag):
+        train, test = split(df, fold, target, lag)
+        model = make_model().fit(train, train[target].to_numpy())
         q = M.monotone(model.predict_quantiles(test))
         out = pd.DataFrame(q, columns=[f"q{t:.2f}" for t in M.QS])
         out.insert(0, "bbref_id", test["bbref_id"].to_numpy())
         out.insert(1, "draft_year", fold.test_year)
-        out.insert(2, "y", test[TARGET].to_numpy())
+        out.insert(2, "y", test[target].to_numpy())
         out.insert(3, "n_train", len(train))
         rows.append(out)
-        log.debug("%s %d: train %d test %d", getattr(model, "name", "?"), fold.test_year,
-                  len(train), len(test))  # fmt: skip
     return pd.concat(rows, ignore_index=True)
 
 
