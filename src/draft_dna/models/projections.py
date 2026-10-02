@@ -19,12 +19,12 @@ import pandas as pd
 from draft_dna.config import Settings
 from draft_dna.eval import backtest as bt
 from draft_dna.eval import metrics as M
-from draft_dna.eval.phase3 import pick_conformal, tier_cuts
+from draft_dna.eval.phase3 import pick_conformal
 from draft_dna.features.predraft import STATS_FEATURES
 from draft_dna.ingest.storage import write_table
 from draft_dna.logging_utils import get_logger
 from draft_dna.models.knn import StatsKnn
-from draft_dna.outcomes.tiers import TIERS
+from draft_dna.outcomes.tiers import TIERS, tier_cuts, tier_probabilities
 
 log = get_logger(__name__)
 
@@ -49,13 +49,6 @@ FEATURE_LABELS = {
 # every one-and-done freshman has the same years in college).
 TRIVIAL = ("college_seasons", "games")
 DESCRIPTIVE = [f for f in STATS_FEATURES if not f.startswith(("src_", "pos_")) and f not in TRIVIAL]
-
-
-def tier_probabilities(q: np.ndarray, cuts: list[float]) -> np.ndarray:
-    """P(tier) for each row from the quantile grid: differences of the CDF at cutoffs."""
-    cdf = np.column_stack([M.cdf_at(q, c) for c in cuts])
-    edges = np.column_stack([np.zeros(len(q)), cdf, np.ones(len(q))])
-    return np.clip(np.diff(edges, axis=1), 0, 1)
 
 
 def _driving_features(model: StatsKnn, row: pd.DataFrame, comp_idx: int, n: int = 3) -> str:

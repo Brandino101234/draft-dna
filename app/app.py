@@ -6,20 +6,30 @@ and rendered cards; `make refresh` updates them during the season.
 
 from __future__ import annotations
 
+import os
+import re
+import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from draft_dna.config import get_settings
-from draft_dna.grading import tracker
-from draft_dna.ingest.storage import read_table
-from draft_dna.viz import cards as card_viz
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))  # deployed app: package not installed
+# With no local build (e.g. Streamlit Community Cloud), read the committed app bundle.
+if not (ROOT / "data" / "modeled" / "grading" / "grades.parquet").exists():
+    os.environ.setdefault("DRAFT_DNA_MODELED", str(ROOT / "app" / "bundle"))
+
+from draft_dna.config import get_settings  # noqa: E402
+from draft_dna.ingest.storage import read_table  # noqa: E402
+from draft_dna.viz import cards as card_viz  # noqa: E402
 
 st.set_page_config(page_title="Draft DNA", page_icon="🏀", layout="wide")
 S = get_settings()
-CARD_DIR = S.paths.modeled / "cards"
+LOCAL_CARDS = S.paths.modeled / "cards"
+CARD_DIR = LOCAL_CARDS if LOCAL_CARDS.exists() else Path(tempfile.gettempdir()) / "draft_dna_cards"
 GRADE_COLORS = {"A": "#1baf7a", "B": "#2a78d6", "C": "#eda100", "D": "#e34948", "-": "#a3a29d"}
 
 
@@ -31,14 +41,21 @@ def load() -> dict[str, pd.DataFrame]:
         "comps": read_table("modeled", "projections", "comps", S),
         "plays_like": read_table("modeled", "grading", "plays_like", S),
         "style_map": read_table("modeled", "grading", "style_map", S),
+        "tracker": read_table("modeled", "grading", "rookie_tracker", S),
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_resource(show_spinner=False)
+def card_data() -> card_viz.CardData:
+    return card_viz.CardData.load(S)
+
+
+@st.cache_data(show_spinner="Drawing card...")
 def card_path(pid: str) -> str:
     path = CARD_DIR / f"{pid}.png"
-    if not path.exists():  # render on demand for players outside the pre-rendered classes
-        card_viz.render(card_viz.CardData.load(S), pid, path)
+    if not path.exists():  # render on demand (always, on the deployed app)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        card_viz.render(card_data(), pid, path)
     return str(path)
 
 
@@ -176,12 +193,12 @@ elif page == "Style map":
 
 elif page == "2026 tracker":
     st.subheader("2026 class: projection vs reality")
-    t = tracker.rookie_tracker(S)
+    t = data["tracker"]
     played = int((t["games"] > 0).sum())
     if played == 0:
         st.info(
             "The 2026-27 season hasn't started yet. Projected rookie-season ranges are below; "
-            "run `make refresh` during the season to add games."
+            "games are added as the season goes on."
         )
     st.caption(
         "Rookie-season value (VORP + Win Shares blend). Bar = draft-night range (25th-90th "
@@ -234,5 +251,14 @@ elif page == "2026 tracker":
     )
 
 else:
-    readme = Path(__file__).resolve().parents[1] / "README.md"
-    st.markdown(readme.read_text())
+    # Render README images from the repo (relative links don't resolve inside Streamlit).
+    chunk: list[str] = []
+    for line in (ROOT / "README.md").read_text().splitlines():
+        m = re.fullmatch(r"!\[(.*)\]\((.+)\)", line.strip())
+        if m and (ROOT / m.group(2)).exists():
+            st.markdown("\n".join(chunk))
+            chunk = []
+            st.image(str(ROOT / m.group(2)), caption=m.group(1))
+        else:
+            chunk.append(line)
+    st.markdown("\n".join(chunk))

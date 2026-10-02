@@ -421,3 +421,14 @@ def test_rookie_tracker_covers_live_class() -> None:
         .isin(["no games yet", "pacing above ceiling", "pacing below floor", "within range"])
         .all()
     )
+
+
+def test_app_bundle_has_everything_the_app_reads(tmp_path) -> None:
+    from draft_dna import app_bundle
+
+    out = app_bundle.export(get_settings(), out=tmp_path)
+    for source, name, _ in app_bundle.TABLES:
+        assert (out / source / f"{name}.parquet").exists(), name
+    assert (out / "outcomes" / "params.json").exists()
+    size = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
+    assert size < 25e6  # the bundle is committed; keep it small

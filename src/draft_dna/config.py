@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -76,6 +77,8 @@ def load_settings(path: Path = DEFAULT_CONFIG, root: Path = REPO_ROOT) -> Settin
         raw = yaml.safe_load(f)
     settings = Settings.model_validate(raw)
     settings.paths = settings.paths.resolved(root)
+    if modeled := os.environ.get("DRAFT_DNA_MODELED"):  # e.g. the deployed app's data bundle
+        settings.paths.modeled = Path(modeled)
     return settings
 
 

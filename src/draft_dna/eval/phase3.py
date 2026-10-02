@@ -163,14 +163,5 @@ def load_frame(s: Settings) -> pd.DataFrame:
     return bt.modeling_frame(s)
 
 
-def tier_cuts(s: Settings) -> list[float]:
-    import json
-
-    params = json.loads(
-        table_path("modeled", "outcomes", "params", s).with_suffix(".json").read_text()
-    )
-    return list(params["tier_cuts_peak3"])
-
-
 def players(s: Settings) -> pd.DataFrame:
     return read_table("modeled", "core", "players", s)

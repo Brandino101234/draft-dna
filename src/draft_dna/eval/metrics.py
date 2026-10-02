@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 QS = np.round(np.arange(0.05, 0.951, 0.05), 2)  # 19 quantiles
+QCOLS = [f"q{t:.2f}" for t in QS]
 FLOOR, MEDIAN, CEILING = 0.25, 0.5, 0.9
 
 
