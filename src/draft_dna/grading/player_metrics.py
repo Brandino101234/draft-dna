@@ -137,6 +137,15 @@ def build(s: Settings) -> pd.DataFrame:
     out["second_vs_slot"] = out["second_pct"] - grades["pick"].map(slot)
     out = out.join(durability(d))
     out["rotation_seasons"] = out["rotation_seasons"].fillna(0).astype(int)
+    # Where he came from, and when he arrived (draft-and-stash shows up as a late debut).
+    players = read_table("modeled", "core", "players", s).set_index("bbref_id")
+    out["college"] = out.index.map(players["college_name"])
+    out["pre_draft_team"] = out.index.map(players["pre_draft_org"])
+    country = out["pre_draft_team"].str.extract(r"\(([^()]+)\)\s*$", expand=False)
+    out["country"] = country.where(~country.str.fullmatch(r"[A-Z]{2}", na=False))  # US states
+    played = d[d["games"] > 0]
+    out["debut_season_num"] = played.groupby("bbref_id")["season_num"].min().reindex(out.index)
+    out["ever_played"] = out["debut_season_num"].notna()
     log.info(
         "player metrics: surplus %d, late bloomer %d, playoff riser %d, second contract %d",
         out["surplus_m"].notna().sum(),

@@ -78,6 +78,7 @@ STALE = _drop_stale_modules() | _bundle_changed()
 from draft_dna.config import get_settings  # noqa: E402
 from draft_dna.grading import classes as C  # noqa: E402
 from draft_dna.ingest.storage import read_table  # noqa: E402
+from draft_dna.outcomes.tiers import ALL_TIERS  # noqa: E402
 from draft_dna.viz import cards as card_viz  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "app"))
@@ -98,11 +99,15 @@ if STALE:  # new code or data deployed: forget cached tables and cards drawn by 
 PAGES = {
     "home": "Home",
     "player": "Player card",
+    "rankings": "Full rankings",
     "redraft": "Redraft",
     "classes": "Draft classes",
     "steals": "Steals & busts",
     "teams": "Teams",
     "leaders": "Leaderboards",
+    "colleges": "Colleges",
+    "international": "International",
+    "game": "Guess the pick",
     "pickvalue": "Pick value",
     "recruits": "Recruits",
     "compare": "Compare",
@@ -131,6 +136,7 @@ def load() -> dict[str, pd.DataFrame]:
         "recruit_summary": read_table("modeled", "recruits", "summary", S),
         "recruit_tests": read_table("modeled", "recruits", "tests", S),
         "metrics": read_table("modeled", "grading", "player_metrics", S),
+        "rim_status": read_table("modeled", "rim_test", "status", S),
         "acc_models": read_table("modeled", "accuracy", "models", S),
         "acc_calibration": read_table("modeled", "accuracy", "calibration", S),
         "acc_allstar": read_table("modeled", "accuracy", "allstar_reliability", S),
@@ -640,6 +646,28 @@ elif page == "accuracy":
         bargap=0.25,
     )
     st.plotly_chart(fig, width="stretch")
+    st.markdown("### A pre-registered test, waiting for its data")
+    rim = data["rim_status"]
+    st.caption(
+        "One hint survived the shot-data analysis: prospects who finish unusually well at the "
+        "rim (college rim FG%, shrunk toward the D-I average) beat their slot slightly more "
+        "often. It was not pre-registered, so it is only a hypothesis. A confirmation test was "
+        "written down in advance (D029) on the 2023-2026 classes, which no analysis has "
+        "touched. It runs automatically when each class reaches year 4; no results are "
+        "peeked at before then. It confirms only if the rim signal correlates with outcomes "
+        "beyond pick + stats AND improves forecasts, both with 95% intervals excluding zero."
+    )
+    st.dataframe(
+        rim,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "draft_class": st.column_config.NumberColumn("Class", format="%d"),
+            "players": "College players with rim data",
+            "ready": "Testable now",
+            "testable_after": "Testable after",
+        },
+    )
     st.caption(
         "Full method and every model's numbers: DECISIONS D020-D024 and D031-D034 in the "
         "repository, and the About page."
@@ -1026,6 +1054,381 @@ elif page == "pickvalue":
         pv[["pick", "value"]].T.round(0).astype(int),
         width="stretch",
         hide_index=False,
+    )
+
+elif page == "rankings":
+    theme.hero(
+        "Full rankings",
+        "Every pick since 1996, ranked",
+        f"All {len(G):,} drafted players on one list. Rank by career peak or by any other "
+        "metric, filter, search, download.",
+    )
+    sort_opts = {
+        "Career peak (all-time rank)": "current_median",
+        "Value vs draft slot": "value_vs_slot",
+        "Rookie-deal surplus": "surplus_m",
+        "Second contract vs slot": "second_vs_slot",
+        "Late bloomer index": "late_bloomer",
+        "Playoff riser": "playoff_riser",
+        "Rotation seasons": "rotation_seasons",
+        "Draft-night projection": "projected_median",
+    }
+    c1, c2, c3 = st.columns([1.4, 1.2, 1])
+    query = c1.text_input("Search players", placeholder="e.g. Curry")
+    sort_label = c2.selectbox("Rank by", list(sort_opts))
+    status_f = c3.selectbox("Careers", ["All", "Finished", "In progress", "Not yet played"])
+    c4, c5, c6 = st.columns([1.6, 0.8, 1.6])
+    with c4:
+        lo, hi = year_range("rank_years", (1996, 2026))
+    rnd = c5.selectbox("Round", ["Both", "1st", "2nd"], key="rank_round")
+    tiers = c6.multiselect("Tiers", ALL_TIERS, placeholder="All tiers")
+    d = grades[grades["draft_year"].between(lo, hi)].copy()
+    if rnd != "Both":
+        d = d[d["round"] == rnd]
+    if tiers:
+        d = d[d["current_tier"].isin(tiers)]
+    if status_f == "Finished":
+        d = d[d["finished"]]
+    elif status_f == "In progress":
+        d = d[~d["finished"] & (d["seasons"] > 0)]
+    elif status_f == "Not yet played":
+        d = d[d["seasons"] == 0]
+    col = sort_opts[sort_label]
+    d = d.dropna(subset=[col]).sort_values(col, ascending=False)
+    d["rank"] = np.arange(1, len(d) + 1)
+    if query:
+        d = d[d["player_name"].str.contains(query, case=False, regex=False)]
+    d["from"] = d["college"].fillna(d["pre_draft_team"])
+    show_cols = [
+        "bbref_id",
+        "rank",
+        "player_name",
+        "draft_year",
+        "pick",
+        "team",
+        "from",
+        "current_tier",
+        "grade",
+        "played_like",
+        "all_time_rank",
+        "current_median",
+        "value_vs_slot",
+    ]
+    if col not in show_cols:
+        show_cols.append(col)
+    st.caption(
+        f"{len(d):,} players. Rank is within the current filters; 'All-time rank' is by "
+        "career peak across every pick. Unfinished careers use current projections."
+    )
+    clickable(
+        d[show_cols],
+        key="rankings_table",
+        column_config={
+            "rank": "#",
+            "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+            "team": "Drafted for",
+            "from": "From",
+            "current_tier": "Tier",
+            "played_like": "Played like",
+            "all_time_rank": st.column_config.NumberColumn("All-time", format="%d"),
+            "current_median": st.column_config.NumberColumn("Peak value", format="%.2f"),
+            "value_vs_slot": st.column_config.NumberColumn("vs slot", format="%+.2f"),
+            "surplus_m": st.column_config.NumberColumn("Surplus $M", format="%+.0f"),
+            "second_vs_slot": st.column_config.NumberColumn(
+                "2nd contract vs slot", format="percent"
+            ),
+            "late_bloomer": st.column_config.NumberColumn("Late bloomer", format="%+.1f"),
+            "playoff_riser": st.column_config.NumberColumn("Playoff riser", format="%+.1f"),
+            "rotation_seasons": "Rotation seasons",
+            "projected_median": st.column_config.NumberColumn("Draft-night median", format="%.2f"),
+        },
+        height=640,
+    )
+    st.download_button(
+        "Download as CSV",
+        d[show_cols].drop(columns="bbref_id").to_csv(index=False),
+        file_name="draft_dna_rankings.csv",
+        mime="text/csv",
+    )
+
+elif page == "colleges":
+    theme.hero(
+        "Colleges",
+        "Which schools beat the draft?",
+        "Every program's NBA picks against what their draft slots usually produce.",
+    )
+    st.caption(
+        "Value vs slot = career peak minus the draft-night median for the slot, averaged over "
+        "a school's picks and shown relative to the average college pick (0 = typical). The "
+        "bars are 90% intervals: with 10-60 picks per school, much of the spread is luck."
+    )
+    c1, c2, c3 = st.columns([1.6, 1, 1])
+    with c1:
+        lo, hi = year_range("college_years", (1996, 2021))
+    min_picks = c2.slider("Min picks", 3, 30, 10)
+    fin = c3.toggle("Finished careers only", value=True, key="college_fin")
+    d = grades[
+        grades["draft_year"].between(lo, hi)
+        & (grades["prospect_source"] == "college")
+        & grades["college"].notna()
+        & (grades["grade"] != "-")
+    ]
+    if fin:
+        d = d[d["finished"]]
+    center = d["value_vs_slot"].mean()
+    star_set = set(C.STAR_TIERS)
+    agg = d.groupby("college").agg(
+        picks=("bbref_id", "size"),
+        avg_pick=("pick", "mean"),
+        vs_slot=("value_vs_slot", "mean"),
+        sd=("value_vs_slot", "std"),
+        beat_slot=("grade", lambda x: x.isin(["A", "B"]).mean()),
+        stars=("current_tier", lambda t: int(t.isin(star_set).sum())),
+    )
+    agg = agg[agg["picks"] >= min_picks].copy()
+    agg["vs_slot"] -= center
+    agg["se"] = agg["sd"] / np.sqrt(agg["picks"])
+    best = d.loc[d.groupby("college")["current_median"].idxmax()].set_index("college")
+    agg["best_player"] = best["player_name"]
+    agg = agg.sort_values("vs_slot", ascending=False).reset_index()
+    show = pd.concat([agg.head(12), agg.tail(8)]).drop_duplicates("college")
+    fig = px.bar(
+        show.iloc[::-1],
+        x="vs_slot",
+        y="college",
+        orientation="h",
+        error_x=1.645 * show.iloc[::-1]["se"],
+        height=560,
+        labels={
+            "vs_slot": "Average value vs slot, relative to the typical college pick",
+            "college": "",
+        },
+        hover_data={"picks": True, "best_player": True},
+    )
+    fig.update_traces(
+        marker_color=[theme.BLUE if v >= 0 else theme.HERO_RED for v in show.iloc[::-1]["vs_slot"]]
+    )
+    fig.add_vline(x=0, line_color=theme.MUTED, line_width=1)
+    st.plotly_chart(fig, width="stretch")
+    st.caption("Top 12 and bottom 8 schools with at least the minimum number of picks.")
+    st.dataframe(
+        agg.drop(columns=["sd", "se"]),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "college": "School",
+            "picks": "Picks",
+            "avg_pick": st.column_config.NumberColumn("Avg pick", format="%.0f"),
+            "vs_slot": st.column_config.NumberColumn("Value vs slot", format="%+.2f"),
+            "beat_slot": st.column_config.ProgressColumn(
+                "Beat slot median", format="percent", min_value=0, max_value=1
+            ),
+            "stars": "All-Stars+",
+            "best_player": "Best player",
+        },
+    )
+    school = st.selectbox("See a school's picks", agg["college"].tolist())
+    if school:
+        picks = d[d["college"] == school].sort_values("current_median", ascending=False)
+        clickable(
+            picks[
+                [
+                    "bbref_id",
+                    "player_name",
+                    "draft_year",
+                    "pick",
+                    "current_tier",
+                    "grade",
+                    "played_like",
+                    "value_vs_slot",
+                ]
+            ],
+            key=f"school_{school}",
+            column_config={
+                "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+                "current_tier": "Tier",
+                "played_like": "Played like",
+                "value_vs_slot": st.column_config.NumberColumn("vs slot", format="%+.2f"),
+            },
+        )
+
+elif page == "international":
+    theme.hero(
+        "International",
+        "The overseas pipeline",
+        "Picks from pro leagues outside the NCAA: who came over, when, and how they did.",
+    )
+    intl = grades[grades["prospect_source"] == "other_team"].copy()
+    intl["country"] = intl["country"].fillna("Other / unknown")
+    intl["stashed"] = intl["debut_season_num"] >= 2
+    done = intl[intl["draft_year"] <= 2021]
+    allp = grades[grades["draft_year"] <= 2021]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "International picks",
+        f"{len(intl):,}",
+        help="Drafted from a pro team outside "
+        "the NCAA (Europe, Australia, G League Ignite, etc.), 1996-2026.",
+    )
+    c2.metric(
+        "Never played in the NBA",
+        f"{(~done['ever_played']).mean():.0%}",
+        delta=f"all picks: {(~allp['ever_played'].fillna(False)).mean():.0%}",
+        delta_color="off",
+        delta_arrow="off",
+        help="Classes through 2021.",
+    )
+    c3.metric(
+        "Arrived a year+ late (stashed)",
+        f"{done.loc[done['ever_played'], 'stashed'].mean():.0%}",
+        help="Of those who did play: debuted in season 2 or later after the draft.",
+    )
+    c4.metric(
+        "Value vs slot",
+        f"{done['value_vs_slot'].mean() - allp['value_vs_slot'].mean():+.2f}",
+        delta="vs all picks",
+        delta_color="off",
+        delta_arrow="off",
+        help="Average career peak minus the draft-night median for the slot, relative "
+        "to all picks (Phase 6: international picks fall short of their slot).",
+    )
+    by_year = (
+        intl.groupby("draft_year")
+        .agg(picks=("bbref_id", "size"), never=("ever_played", lambda x: int((~x).sum())))
+        .reset_index()
+    )
+    by_year["played"] = by_year["picks"] - by_year["never"]
+    yr = by_year.melt(
+        id_vars="draft_year", value_vars=["played", "never"], var_name="status", value_name="n"
+    )
+    yr["status"] = yr["status"].map({"played": "Played in the NBA", "never": "Never played"})
+    fig = px.bar(
+        yr,
+        x="draft_year",
+        y="n",
+        color="status",
+        height=360,
+        color_discrete_map={
+            "Played in the NBA": theme.BLUE,
+            "Never played": "rgba(255,55,95,0.65)",
+        },
+        labels={"draft_year": "Draft class", "n": "International picks", "status": ""},
+    )
+    fig.update_layout(legend={"orientation": "h", "y": 1.1, "x": 0})
+    st.plotly_chart(fig, width="stretch")
+    st.caption("Recent classes still have players overseas who may come over later.")
+    min_n = st.slider("Min picks per country", 1, 15, 4)
+    star_set = set(C.STAR_TIERS)
+    agg = intl.groupby("country").agg(
+        picks=("bbref_id", "size"),
+        played=("ever_played", "mean"),
+        stashed=("stashed", "mean"),
+        vs_slot=("value_vs_slot", "mean"),
+        stars=("current_tier", lambda t: int(t.isin(star_set).sum())),
+    )
+    best = intl.loc[intl.groupby("country")["current_median"].idxmax()].set_index("country")
+    agg["best_player"] = best["player_name"]
+    agg = agg[agg["picks"] >= min_n].sort_values("picks", ascending=False).reset_index()
+    st.dataframe(
+        agg,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "country": "Country / league",
+            "picks": "Picks",
+            "played": st.column_config.ProgressColumn(
+                "Played in NBA", format="percent", min_value=0, max_value=1
+            ),
+            "stashed": st.column_config.NumberColumn("Arrived late", format="percent"),
+            "vs_slot": st.column_config.NumberColumn("Value vs slot", format="%+.2f"),
+            "stars": "All-Stars+",
+            "best_player": "Best player",
+        },
+    )
+    country = st.selectbox("See a country's picks", agg["country"].tolist())
+    if country:
+        picks = intl[intl["country"] == country].sort_values("current_median", ascending=False)
+        clickable(
+            picks[
+                [
+                    "bbref_id",
+                    "player_name",
+                    "draft_year",
+                    "pick",
+                    "pre_draft_team",
+                    "debut_season_num",
+                    "current_tier",
+                    "grade",
+                ]
+            ],
+            key=f"country_{country}",
+            column_config={
+                "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+                "pre_draft_team": "Pre-draft team",
+                "debut_season_num": st.column_config.NumberColumn("Debut (season #)", format="%d"),
+                "current_tier": "Tier",
+            },
+        )
+
+elif page == "game":
+    theme.hero(
+        "Guess the pick",
+        "Where was he drafted?",
+        "You get the career. Guess the draft slot. Closer guesses score more.",
+    )
+    pool = grades[
+        grades["finished"] & grades["ever_played"].fillna(False) & (grades["draft_year"] <= 2021)
+    ]
+    first_only = st.toggle("First-round picks only", value=True, key="game_first")
+    if first_only:
+        pool = pool[pool["pick"] <= 30]
+    ss = st.session_state
+    ss.setdefault("game_score", 0)
+    ss.setdefault("game_rounds", 0)
+    if "game_pid" not in ss or ss["game_pid"] not in pool["bbref_id"].values:
+        ss["game_pid"] = pool.sample(1)["bbref_id"].iloc[0]
+        ss["game_revealed"] = False
+    g = G.loc[ss["game_pid"]]
+    with st.container(border=True):
+        st.markdown(f"### {g['player_name']}")
+        frm = g["college"] if pd.notna(g["college"]) else g["pre_draft_team"]
+        honors = g["current_tier"]
+        st.markdown(
+            f"**{int(g['draft_year'])} draft** · from {frm} · career tier **{honors}** · "
+            f"all-time rank **{int(g['all_time_rank'])}** of {len(G):,} · "
+            f"{int(g['rotation_seasons'])} rotation seasons"
+        )
+        st.caption(
+            f"Peak value {g['current_median']:.2f} · late bloomer "
+            f"{_fmt_or(g['late_bloomer'], '+.1f')} · playoff riser "
+            f"{_fmt_or(g['playoff_riser'], '+.1f')}"
+        )
+    max_pick = 30 if first_only else 60
+    guess = st.slider("Your guess: pick #", 1, max_pick, min(15, max_pick), key="game_guess")
+    b1, b2, _ = st.columns([1, 1, 3])
+    if b1.button("Lock it in", disabled=ss.get("game_revealed", False)):
+        miss = abs(guess - int(g["pick"]))
+        pts = max(0, 100 - 10 * miss) if first_only else max(0, 100 - 5 * miss)
+        ss["game_score"] += pts
+        ss["game_rounds"] += 1
+        ss["game_revealed"] = True
+        ss["game_last"] = (miss, pts)
+    if ss.get("game_revealed"):
+        miss, pts = ss["game_last"]
+        verdict = "Exact!" if miss == 0 else f"Off by {miss}"
+        st.success(
+            f"**Pick #{int(g['pick'])}** by {g['team']} · {verdict} · +{pts} points. "
+            f"He played like a typical **{g['played_like']}** pick."
+        )
+        if b2.button("Next player →"):
+            del ss["game_pid"]
+            st.rerun()
+    st.metric(
+        "Score",
+        f"{ss['game_score']}",
+        delta=f"{ss['game_rounds']} rounds",
+        delta_color="off",
+        delta_arrow="off",
     )
 
 elif page == "steals":

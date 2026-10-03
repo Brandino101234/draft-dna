@@ -110,11 +110,12 @@ def grade() -> None:
     grading.run(s)
     extras.run(s)
     write_table(tracker.rookie_tracker(s), "modeled", "grading", "rookie_tracker", s)
-    from draft_dna.eval import accuracy
+    from draft_dna.eval import accuracy, rim_confirmation
     from draft_dna.grading import player_metrics
 
     accuracy.run(s)
     player_metrics.run(s)
+    rim_confirmation.run(s)  # writes status; runs the D029 test once a class is ready
     db.load(s)
 
 
