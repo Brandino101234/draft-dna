@@ -104,6 +104,7 @@ PAGES = {
     "classes": "Draft classes",
     "steals": "Steals & busts",
     "teams": "Teams",
+    "trades": "Pick trades",
     "leaders": "Leaderboards",
     "colleges": "Colleges",
     "international": "International",
@@ -156,6 +157,7 @@ def load() -> dict[str, pd.DataFrame]:
         "recruit_tests": read_table("modeled", "recruits", "tests", S),
         "metrics": read_table("modeled", "grading", "player_metrics", S),
         "rim_status": read_table("modeled", "rim_test", "status", S),
+        "pick_trades": read_table("modeled", "grading", "pick_trades", S),
         "acc_models": read_table("modeled", "accuracy", "models", S),
         "acc_calibration": read_table("modeled", "accuracy", "calibration", S),
         "acc_allstar": read_table("modeled", "accuracy", "allstar_reliability", S),
@@ -1482,6 +1484,128 @@ elif page == "game":
         delta_color="off",
         delta_arrow="off",
     )
+
+elif page == "trades":
+    theme.hero(
+        "Pick trades",
+        "Was trading for that pick worth it?",
+        "Every draft-night deal since 1996: what the team trading for the pick got, against "
+        "what it gave up.",
+    )
+    tr = data["pick_trades"].copy()
+    scored_mask = tr["verdict"].isin(["worth it", "even", "not worth it"])
+    tr["band"] = pd.cut(
+        tr["top_pick"], [0, 5, 14, 30, 60], labels=["Picks 1-5", "6-14", "15-30", "2nd round"]
+    ).astype("string")
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        lo, hi = year_range("trade_years", (1996, 2021))
+    finished_only = c2.toggle(
+        "Exclude careers still in progress",
+        value=True,
+        key="trade_fin",
+        help="Trades from 2022 on are judged on careers that are only a few years old.",
+    )
+    d = tr[tr["draft_year"].between(lo, hi)]
+    if finished_only:
+        d = d[~d["in_progress"]]
+    sc = d[scored_mask.reindex(d.index)]
+    share = sc["verdict"].value_counts(normalize=True)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(
+        "Trades scored",
+        f"{len(sc):,}",
+        help=f"Of {len(d):,} draft-night trades in "
+        "range. Three-team deals, pick-swap rights and assets from before 1996 or "
+        "unresolved future picks can't be scored.",
+    )
+    k2.metric(
+        "Worth it",
+        f"{share.get('worth it', 0):.0%}",
+        help=f"The team trading for the pick got at least {0.25} more value than it gave.",
+    )
+    k3.metric("Even", f"{share.get('even', 0):.0%}", help="Within 0.25 either way.")
+    k4.metric("Not worth it", f"{share.get('not worth it', 0):.0%}")
+    st.caption(
+        "Value of everything that changed hands = each player's best 3-season stretch AFTER "
+        "the trade (playoffs included), so a veteran only counts for what he did once "
+        "dealt. Future picks count as the player they became. 'Buyer' = the team that got "
+        "the best pick in the deal. Scale: 0.3 typical player, 1.0 starter, 1.8 All-Star."
+    )
+    by = sc.groupby("band")["verdict"].value_counts(normalize=True).rename("share").reset_index()
+    n_by = sc.groupby("band").size()
+    by["band_n"] = by["band"] + by["band"].map(lambda b: f" (n={n_by.get(b, 0)})")
+    order = ["Picks 1-5", "6-14", "15-30", "2nd round"]
+    fig = px.bar(
+        by,
+        x="share",
+        y="band_n",
+        color="verdict",
+        orientation="h",
+        height=320,
+        category_orders={
+            "verdict": ["worth it", "even", "not worth it"],
+            "band_n": [b + f" (n={n_by.get(b, 0)})" for b in order],
+        },
+        color_discrete_map={"worth it": "#30d158", "even": "#6b6b76", "not worth it": "#ff453a"},
+        text=by["share"].map(lambda v: f"{v:.0%}"),
+        labels={"share": "", "band_n": "", "verdict": ""},
+    )
+    fig.update_layout(
+        xaxis={"tickformat": ".0%", "range": [0, 1]}, legend={"orientation": "h", "y": 1.15, "x": 0}
+    )
+    st.plotly_chart(fig, width="stretch")
+    st.caption(
+        "Trading up for a first-round pick is close to a coin flip; second-round deals are "
+        "mostly a wash (little value on either side)."
+    )
+    cols = [
+        "top_id",
+        "draft_year",
+        "buyer",
+        "got",
+        "seller",
+        "gave",
+        "value_got",
+        "value_gave",
+        "diff",
+        "verdict",
+    ]
+    cfg = {
+        "draft_year": st.column_config.NumberColumn("Draft", format="%d"),
+        "buyer": st.column_config.TextColumn(
+            "Traded for it", help="Team that got the best pick in the deal."
+        ),
+        "got": "Got",
+        "seller": "Traded away",
+        "gave": "Gave up",
+        "value_got": st.column_config.NumberColumn("Value got", format="%.2f"),
+        "value_gave": st.column_config.NumberColumn("Value gave", format="%.2f"),
+        "diff": st.column_config.NumberColumn(
+            "Net", format="%+.2f", help="Value got minus value given (after the trade)."
+        ),
+        "verdict": "Verdict",
+    }
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Best draft-night trades**")
+        best = sc.nlargest(15, "diff")[cols].rename(columns={"top_id": "bbref_id"})
+        best = best.dropna(subset=["bbref_id"])
+        clickable(best, key="trades_best", column_config=cfg)
+    with right:
+        st.markdown("**Worst draft-night trades**")
+        worst = sc.nsmallest(15, "diff")[cols].rename(columns={"top_id": "bbref_id"})
+        worst = worst.dropna(subset=["bbref_id"])
+        clickable(worst, key="trades_worst", column_config=cfg)
+    st.caption("Click a row to open the card of the top pick that was traded for.")
+    with st.expander(f"All {len(d):,} draft-night trades in range (including unscored)"):
+        allt = d.sort_values(["draft_year", "top_pick"])[cols].rename(
+            columns={"top_id": "bbref_id"}
+        )
+        allt["bbref_id"] = allt["bbref_id"].fillna("")
+        st.dataframe(
+            allt.drop(columns="bbref_id"), hide_index=True, width="stretch", column_config=cfg
+        )
 
 elif page == "steals":
     theme.hero(

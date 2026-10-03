@@ -190,3 +190,26 @@ def test_honor_tiers_ladder() -> None:
     assert honor_tier(all_nba=1, first_team=1, mvps=1) == "MVP"  # Derrick Rose
     assert honor_tier(all_nba=6, first_team=6, mvps=0) == "Superstar"  # Luka
     assert honor_tier(all_nba=5, first_team=1, mvps=0) is None  # stays All-NBA
+
+
+def test_parse_trades_splits_sides_and_resolves_future_picks() -> None:
+    from draft_dna.grading.pick_trades import parse_trades
+
+    html = b"""<div id="div_transactions">
+    <p class="transaction "><strong>June 21, 2018</strong>: Traded by the
+      <a data-attr-from="ATL" href="/teams/ATL/2018.html">Hawks</a> with
+      <a href="/players/x/extraxx01.html">Extra Guy</a> to the
+      <a data-attr-to="DAL" href="/teams/DAL/2018.html">Mavericks</a> for
+      <a href="/players/y/youngtr01.html">Trae Young</a> and a 2019 1st round draft pick
+      (<a href="/players/r/reddica01.html">Cam Reddish</a> was later selected) and a 2030
+      2nd round draft pick.</p>
+    <p class="transaction "><strong>June 22, 2018</strong>: As part of a 3-team trade,
+      traded by the <a data-attr-from="X" href="#">X</a> to the
+      <a data-attr-to="Y" href="#">Y</a>.</p>
+    </div>"""
+    t = parse_trades(html, "doncilu01")
+    assert t[0]["sent"] == ["doncilu01", "extraxx01"]
+    assert t[0]["received"] == ["reddica01", "youngtr01"]
+    assert t[0]["received_unresolved"] == 1  # the 2030 pick hasn't become a player
+    assert t[0]["team_from"] == "ATL" and t[0]["team_to"] == "DAL"
+    assert t[1]["multi_team"]
