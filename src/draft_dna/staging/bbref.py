@@ -187,6 +187,9 @@ def run(s: Settings) -> None:
     write_table(stage_coaches(s), "staging", "bbref", "nba_coaches", s)
     write_table(stage_awards(s), "staging", "bbref", "nba_awards", s)
     write_table(stage_all_stars(s), "staging", "bbref", "nba_all_stars", s)
+    if table_path("raw", "bbref", "finals_mvp", s).exists():
+        fm = _raw("finals_mvp", s).drop_duplicates(["season", "bbref_id"])
+        write_table(fm, "staging", "bbref", "nba_finals_mvp", s)
     write_table(stage_league_averages(s), "staging", "bbref", "nba_league_averages", s)
     if table_path("raw", "bbref", "salary_cap", s).exists():
         write_table(stage_salary_cap(s), "staging", "bbref", "salary_cap", s)

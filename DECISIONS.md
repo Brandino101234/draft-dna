@@ -413,3 +413,32 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Legend:** 2+ MVPs or 10+ All-NBA selections. 11 players: Kobe, Nash, Duncan, Dirk, LeBron, Paul, Durant, Curry, Giannis, Jokić, SGA.
 - **Not used:** Finals MVP isn't in the data (D033).
 - **How they're used:** class-strength star counts include the honor tiers, and cards show the honor on the All-NBA bar.
+
+### D040: Dunking vs finishing at the rim in player styles
+
+**Data:**
+- **NBA:** a rim shot is one within 4 ft. Dunk share = rim attempts whose action type contains "Dunk"; rim FG% over 100+ rim attempts.
+- **College:** play-by-play dunk share and shrunk rim FG% (Phase 4).
+
+**Stability, college to NBA (642 players with both):** dunk share ρ = 0.83, rim FG% ρ = 0.49. Dunk share is the most stable style trait we measure.
+
+**Matching:**
+- **Vector:** plays-like and the t-SNE map now use [unit-length NMF shot-location mix, 0.5 × dunk-share z-score (within league)], re-normalized. Players with no rim data sit at the league average.
+- **Weight choice:** picked by self-retrieval. For 251 players with both college and NBA data, rank their own NBA style among 1,365 NBA players using their *college* style. Median rank improved 175 → 99, and the share found in the top 5% rose 24% → 38% (α = 0.25: 115/35%; α = 1: 116/38%).
+- **Rarity:** style-match rarity percentiles use the same vectors.
+
+**Display:** the Style map gains a "Dunker vs finisher" layout (dunk share vs rim FG%), and cards add "At the rim: X% of shots are dunks · Y% FG there". Caveat: NBA play types code many power finishes as layups, so NBA dunk shares can read low (Zion 14%).
+
+### D041: Finals MVPs in the Legend rule; rankings, colleges, international, game, rim-test status
+
+**Finals MVP:**
+- **Data:** ingested from the Basketball-Reference history page (one cached request) and added to player-seasons.
+- **Rule:** Legend = 2+ MVPs, 2+ Finals MVPs or 10+ All-NBA selections. Kawhi Leonard (2 Finals MVPs) moves from Superstar to Legend; the others already qualified.
+
+**New pages:**
+- **Full rankings:** all 1,833 picks, rankable by any metric, with filters and CSV download.
+- **Colleges:** value vs slot per school, relative to the average college pick, with 90% intervals, a minimum-picks filter and per-school player lists.
+- **International:** pro-team picks, 339 total. 30% of classes through 2021 never played in the NBA, 45% of those who did arrived a year or more late, and value vs slot is −0.06 relative to all picks (consistent with Phase 6).
+- **Guess the pick:** a game on finished careers.
+
+**Rim-finishing confirmation (D029):** `eval/rim_confirmation.py` implements the pre-registered tests exactly and runs inside `draft-dna grade`. It writes only a status until a cohort class has year-4 outcomes: 2023 → after 2026-27, through 2026 → after 2029-30 (185 cohort players). No interim results are computed or shown. A dry run on already-used 2019–20 classes was used only to check that the code runs.

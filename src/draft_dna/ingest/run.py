@@ -42,6 +42,7 @@ def run_bbref_league(settings: Settings | None = None) -> None:
     write_table(bbref.ingest_coaches(f, nba_seasons(s), cur), "raw", "bbref", "coaches", s)
     write_table(bbref.ingest_awards(f, completed_seasons(s)), "raw", "bbref", "awards", s)
     write_table(bbref.ingest_all_stars(f, completed_seasons(s)), "raw", "bbref", "all_stars", s)
+    write_table(bbref.ingest_finals_mvp(f), "raw", "bbref", "finals_mvp", s)
     log.info("bbref league pages done (%d network requests)", f.network_requests)
 
 

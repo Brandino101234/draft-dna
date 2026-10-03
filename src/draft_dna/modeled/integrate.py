@@ -139,6 +139,13 @@ def nba_player_seasons(s: Settings, universe: pd.DataFrame) -> pd.DataFrame:
     stars = read_table("staging", "bbref", "nba_all_stars", s)
     star_keys = set(zip(stars["bbref_id"], stars["season"], strict=True))
     out["all_star"] = [k in star_keys for k in zip(out["bbref_id"], out["season"], strict=True)]
+    out["won_finals_mvp"] = False
+    if table_path("staging", "bbref", "nba_finals_mvp", s).exists():
+        fm = read_table("staging", "bbref", "nba_finals_mvp", s)
+        fm_keys = set(zip(fm["bbref_id"], fm["season"], strict=True))
+        out["won_finals_mvp"] = [
+            k in fm_keys for k in zip(out["bbref_id"], out["season"], strict=True)
+        ]
 
     # Era adjustment: efficiency and shot mix relative to that season's league average.
     # Counting stats are already available per 100 possessions (pace-neutral).
