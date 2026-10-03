@@ -289,7 +289,7 @@ def _plays_like(ax: Axes, d: CardData, pid: str) -> None:
     ax.text(
         0,
         0.80,
-        "Stylistic only: where he shoots from, not how good he will be.",
+        "Style match % (top % = how rare). Stylistic only, not how good he will be.",
         fontsize=7.5,
         color=TEXT_2,
         va="top",
@@ -298,7 +298,9 @@ def _plays_like(ax: Axes, d: CardData, pid: str) -> None:
         ax.text(0, 0.6, "No shot-location data", fontsize=9, color=TEXT_2)
     for i, r in enumerate(pl.itertuples()):
         ax.text(0, 0.62 - 0.13 * i, f"{r.rank}. {r.plays_like_name}", fontsize=10, color=TEXT)
-        ax.text(0.75, 0.62 - 0.13 * i, f"{r.style_similarity:.2f}", fontsize=9, color=TEXT_2)
+        pct = getattr(r, "style_percentile", None)
+        top = "" if pct is None or pd.isna(pct) else f" · top {max(1 - pct, 0.001):.0%}"
+        ax.text(0.68, 0.62 - 0.13 * i, f"{r.style_similarity:.0%}{top}", fontsize=9, color=TEXT_2)
 
 
 def render(d: CardData, pid: str, path: Path) -> Path:

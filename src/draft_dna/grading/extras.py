@@ -127,6 +127,15 @@ def plays_like(
     return pd.DataFrame(rows)
 
 
+def similarity_percentile(nba_w: pd.DataFrame, sims: pd.Series) -> pd.Series:
+    """Share of all NBA player pairs that are less similar than each score. Raw cosine
+    similarities run high (two random players are ~0.82 alike), so this is the honest scale."""
+    x = nba_w.to_numpy()
+    x = x / np.linalg.norm(x, axis=1, keepdims=True)
+    pairs = np.sort((x @ x.T)[np.triu_indices(len(x), 1)])
+    return pd.Series(np.searchsorted(pairs, sims.to_numpy()) / len(pairs), index=sims.index)
+
+
 def style_map(
     college_w: pd.DataFrame,
     nba_w: pd.DataFrame,
@@ -156,6 +165,7 @@ def run(s: Settings) -> None:
     recent = players.index[players["drafted"] & (players["draft_year"] >= 2022)]
     pl = plays_like(college_w, nba_w, heights, recent, use_nba_for=nba_w.index)
     pl["plays_like_name"] = pl["plays_like_id"].map(players["player_name"])
+    pl["style_percentile"] = similarity_percentile(nba_w, pl["style_similarity"])
     write_table(pl, "modeled", "grading", "plays_like", s)
     write_table(college_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_college", s)
     write_table(nba_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_nba", s)

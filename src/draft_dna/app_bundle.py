@@ -27,6 +27,7 @@ TABLES: list[tuple[str, str, list[str] | None]] = [
     ("grading", "nba_maps", None),
     ("grading", "rookie_tracker", None),
     ("projections", "comps", None),
+    ("grading", "player_metrics", None),
     ("accuracy", "models", None),
     ("accuracy", "calibration", None),
     ("accuracy", "allstar_reliability", None),
