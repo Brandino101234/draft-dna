@@ -1260,7 +1260,11 @@ elif page == "styles":
     sm = data["style_map"].dropna(subset=["player_name"])
     view = st.radio(
         "Layout",
-        ["Rim vs three (readable axes)", "Style similarity map (t-SNE)"],
+        [
+            "Rim vs three (readable axes)",
+            "Dunker vs finisher (at the rim)",
+            "Style similarity map (t-SNE)",
+        ],
         horizontal=True,
     )
     c1, c2 = st.columns([1, 2])
@@ -1278,8 +1282,23 @@ elif page == "styles":
         ],
     )
     readable = view.startswith("Rim")
-    xcol, ycol = ("rim_share", "three_share") if readable else ("x", "y")
-    if readable:
+    rimview = view.startswith("Dunker")
+    xcol, ycol = (
+        ("rim_share", "three_share")
+        if readable
+        else ("dunk_share", "rim_fg")
+        if rimview
+        else ("x", "y")
+    )
+    if rimview:
+        sm = sm.dropna(subset=["dunk_share", "rim_fg"])
+        st.caption(
+            "Only shots at the rim (within 4 ft): **across** = share that were dunks, **up** = "
+            "field-goal percentage there (college: shrunk toward the D-I average). Right = "
+            "dunkers (lobs, putbacks), left = layup finishers. Dunk rate carries over from "
+            "college to the NBA very strongly (rho 0.83), so it is part of style matching."
+        )
+    elif readable:
         sm = sm.dropna(subset=["rim_share", "three_share"])
         st.caption(
             "Each dot is one player's shot diet: **across** = share of shots at the rim "
@@ -1295,7 +1314,14 @@ elif page == "styles":
             "rerun could rotate or flip the picture). Use the readable layout for "
             "interpretable axes."
         )
-    hover = {"x": False, "y": False, "rim_share": ":.0%", "three_share": ":.0%"}
+    hover = {
+        "x": False,
+        "y": False,
+        "rim_share": ":.0%",
+        "three_share": ":.0%",
+        "dunk_share": ":.0%",
+        "rim_fg": ":.0%",
+    }
     fig = px.scatter(
         sm,
         x=xcol,
@@ -1308,6 +1334,8 @@ elif page == "styles":
         labels={
             "rim_share": "Share of shots at the rim",
             "three_share": "Share of shots from three",
+            "dunk_share": "Dunks, share of rim shots",
+            "rim_fg": "FG% at the rim",
             "dominant_style": "Dominant style",
             "source": "Shots from",
         },
@@ -1329,6 +1357,11 @@ elif page == "styles":
         fig.update_layout(
             xaxis={"tickformat": ".0%", "range": [0, 1]},
             yaxis={"tickformat": ".0%", "range": [0, 0.9]},
+        )
+    elif rimview:
+        fig.update_layout(
+            xaxis={"tickformat": ".0%", "range": [0, 0.8]},
+            yaxis={"tickformat": ".0%", "range": [0.3, 0.95]},
         )
     else:
         fig.update_layout(xaxis_visible=False, yaxis_visible=False)

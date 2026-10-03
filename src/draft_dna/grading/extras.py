@@ -127,6 +127,38 @@ def plays_like(
     return pd.DataFrame(rows)
 
 
+DUNK_WEIGHT = 0.5  # chosen by self-retrieval (D040): college style finds own NBA style best
+
+
+def nba_rim_profile(s: Settings, min_att: int = 100) -> pd.DataFrame:
+    """NBA early-career rim attempts (<= 4 ft): share that were dunks, and FG%."""
+    shots = read_table("raw", "nba_api", "shots_early_career", s)
+    rim = shots[shots["SHOT_DISTANCE"] <= 4]
+    g = rim.groupby("bbref_id").agg(
+        rim_att=("SHOT_MADE_FLAG", "size"),
+        rim_fg=("SHOT_MADE_FLAG", "mean"),
+        dunk_share=("ACTION_TYPE", lambda a: a.str.contains("Dunk").mean()),
+    )
+    return g[g["rim_att"] >= min_att]
+
+
+def college_rim_profile(s: Settings) -> pd.DataFrame:
+    d = read_table("modeled", "features", "shot_dna", s).set_index("bbref_id")
+    return d[["dunk_share", "rim_fg_eb"]].rename(columns={"rim_fg_eb": "rim_fg"})
+
+
+def with_dunks(weights: pd.DataFrame, dunk: pd.Series) -> pd.DataFrame:
+    """Shot-location style mix (unit length) plus a dunking dimension: dunk share of rim
+    shots, z-scored within its league (college or NBA), times DUNK_WEIGHT. Players with no
+    rim data sit at the league average (0). Re-normalized so cosine similarity applies."""
+    x = weights.to_numpy(dtype=float)
+    x = x / np.linalg.norm(x, axis=1, keepdims=True)
+    z = ((dunk - dunk.mean()) / dunk.std()).reindex(weights.index).fillna(0.0).to_numpy()
+    v = np.hstack([x, DUNK_WEIGHT * z[:, None]])
+    v = v / np.linalg.norm(v, axis=1, keepdims=True)
+    return pd.DataFrame(v, index=weights.index, columns=[*weights.columns, "dunk"])
+
+
 def similarity_percentile(nba_w: pd.DataFrame, sims: pd.Series) -> pd.Series:
     """Share of all NBA player pairs that are less similar than each score. Raw cosine
     similarities run high (two random players are ~0.82 alike), so this is the honest scale."""
@@ -141,9 +173,16 @@ def style_map(
     nba_w: pd.DataFrame,
     labels: dict[str, str] | None = None,
     seed: int = 0,
+    embed: tuple[pd.DataFrame, pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
+    """t-SNE layout; `embed` (college, NBA vectors) overrides what is laid out, while the
+    dominant style label always comes from the shot-location weights."""
     both = pd.concat([college_w.assign(source="college"), nba_w.assign(source="NBA early career")])
-    x = both.drop(columns="source").to_numpy()
+    if embed is not None:
+        # Same row order as `both` (college rows, then NBA); ids repeat across the two.
+        x = np.vstack([embed[0].loc[college_w.index], embed[1].loc[nba_w.index]])
+    else:
+        x = both.drop(columns="source").to_numpy()
     xy = TSNE(n_components=2, perplexity=30, random_state=seed, init="pca").fit_transform(x)
     out = both[["source"]].copy()
     out["x"], out["y"] = xy[:, 0], xy[:, 1]
@@ -163,15 +202,23 @@ def run(s: Settings) -> None:
     feats = read_table("modeled", "features", "predraft", s).set_index("bbref_id")
     heights = feats["height_in"].astype(float)
     recent = players.index[players["drafted"] & (players["draft_year"] >= 2022)]
-    pl = plays_like(college_w, nba_w, heights, recent, use_nba_for=nba_w.index)
+    college_rim, nba_rim = college_rim_profile(s), nba_rim_profile(s)
+    college_v = with_dunks(college_w, college_rim["dunk_share"])
+    nba_v = with_dunks(nba_w, nba_rim["dunk_share"])
+    pl = plays_like(college_v, nba_v, heights, recent, use_nba_for=nba_v.index)
     pl["plays_like_name"] = pl["plays_like_id"].map(players["player_name"])
-    pl["style_percentile"] = similarity_percentile(nba_w, pl["style_similarity"])
+    pl["style_percentile"] = similarity_percentile(nba_v, pl["style_similarity"])
     write_table(pl, "modeled", "grading", "plays_like", s)
     write_table(college_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_college", s)
     write_table(nba_w.reset_index(names="bbref_id"), "modeled", "grading", "styles_nba", s)
     write_table(nba_maps(s).reset_index(names="bbref_id"), "modeled", "grading", "nba_maps", s)
-    sm = style_map(college_w, nba_w, labels)
+    sm = style_map(college_w, nba_w, labels, embed=(college_v, nba_v))
     sm["player_name"] = sm["bbref_id"].map(players["player_name"])
+    is_col = sm["source"] == "college"
+    for col in ("dunk_share", "rim_fg"):
+        sm[col] = np.where(
+            is_col, sm["bbref_id"].map(college_rim[col]), sm["bbref_id"].map(nba_rim[col])
+        )
     college_axes = readable_axes(
         read_table("modeled", "features", "shot_zones", s).set_index("bbref_id")
     )

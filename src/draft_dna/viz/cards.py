@@ -74,6 +74,7 @@ class CardData:
     peaks: pd.DataFrame
     cuts: list[float]
     nba_maps: pd.DataFrame
+    rim: pd.DataFrame
 
     @classmethod
     def load(cls, s: Settings) -> CardData:
@@ -91,6 +92,9 @@ class CardData:
             ),
             cuts=tier_cuts(s),
             nba_maps=read_table("modeled", "grading", "nba_maps", s).set_index("bbref_id"),
+            rim=read_table("modeled", "grading", "style_map", s)[
+                ["bbref_id", "source", "dunk_share", "rim_fg"]
+            ],
         )
 
 
@@ -357,10 +361,28 @@ def _render(d: CardData, pid: str, path: Path) -> Path:
     )
 
     main = fig.add_subplot(gs[1, 0:2])
-    if pid not in d.maps.index and pid in d.nba_maps.index:
+    nba_main = pid not in d.maps.index and pid in d.nba_maps.index
+    if nba_main:
         _shot_map(main, d, pid, "NBA shot map (no college data)", big=True, nba=True)
     else:
         _shot_map(main, d, pid, "College shot map", big=True)
+    rim = d.rim[
+        (d.rim["bbref_id"] == pid)
+        & (d.rim["source"] == ("NBA early career" if nba_main else "college"))
+    ].dropna(subset=["dunk_share"])
+    if len(rim):
+        r = rim.iloc[0]
+        fg = "" if pd.isna(r["rim_fg"]) else f" · {r['rim_fg']:.0%} FG there"
+        main.text(
+            0.5,
+            -0.06,
+            f"At the rim: {r['dunk_share']:.0%} of shots are dunks{fg}",
+            transform=main.transAxes,
+            ha="center",
+            va="top",
+            fontsize=8.5,
+            color=TEXT_2,
+        )
     comps = _card_comps(d, pid)
     # High-school and pro-team prospects have few pre-draft stats: their comps rest mostly
     # on age, size and position, so the similarity score overstates how alike they are.
