@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 
@@ -20,6 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.colors import LinearSegmentedColormap, PowerNorm
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Rectangle
 
@@ -30,9 +32,27 @@ from draft_dna.ingest.storage import read_table
 from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
 from draft_dna.viz.court import draw_folded_half_court
 
-SURFACE, TEXT, TEXT_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3de"
-BLUE, ORANGE = "#2a78d6", "#eb6834"
-GRADE_COLOR = {"A": "#1baf7a", "B": "#2a78d6", "C": "#eda100", "D": "#e34948", "-": "#a3a29d"}
+# Dark "hero" card: near-black surface, Apple dark-mode accents, glowing shot maps.
+SURFACE, PANEL = "#0b0b10", "#14141c"
+TEXT, TEXT_2, GRID = "#f5f5f7", "#a1a1aa", "#2c2c36"
+BLUE, ORANGE, HERO = "#0a84ff", "#ff9f0a", "#ff375f"
+COURT_LINE = "#5a5a66"
+GRADE_COLOR = {"A": "#30d158", "B": "#0a84ff", "C": "#ffd60a", "D": "#ff453a", "-": "#6b6b76"}
+SHOT_CMAP = LinearSegmentedColormap.from_list(
+    "hero_glow", [PANEL, "#0b2a5c", "#0a84ff", "#64d2ff", "#ffffff"]
+)
+DARK_RC: dict[str, Any] = {
+    "axes.facecolor": PANEL,
+    "axes.edgecolor": GRID,
+    "axes.labelcolor": TEXT_2,
+    "text.color": TEXT,
+    "xtick.color": TEXT_2,
+    "ytick.color": TEXT_2,
+    "legend.facecolor": PANEL,
+    "legend.edgecolor": GRID,
+    "legend.labelcolor": TEXT,
+    "font.family": ["Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
+}
 
 
 @dataclass
@@ -96,13 +116,14 @@ def _shot_map(
         ax.imshow(
             grid.T,
             origin="lower",
-            cmap="Blues",
+            cmap=SHOT_CMAP,
             interpolation="bilinear",
+            norm=PowerNorm(gamma=0.55),  # lift mid-density areas so the glow isn't rim-only
             extent=(-0.5, 25.5, shot_xy.GRID_Y[0] - 0.5, shot_xy.GRID_Y[-1] + 0.5),
         )
-        draw_folded_half_court(ax, lw=0.8 if big else 0.6)
+        draw_folded_half_court(ax, lw=0.8 if big else 0.6, color=COURT_LINE)
     else:
-        draw_folded_half_court(ax, lw=0.6)
+        draw_folded_half_court(ax, lw=0.6, color=COURT_LINE)
         ax.text(
             12.5,
             12,
@@ -136,7 +157,7 @@ def _range(ax: Axes, d: CardData, pid: str) -> None:
         ax.text(c + 0.03, 1.32, label, fontsize=7.5, color=TEXT_2)
     if ceil - floor < 0.05:  # finished career: the outcome is known
         p_floor, p_ceil = g["projected_floor"], g["projected_ceiling"]
-        ax.hlines(0.6, p_floor, p_ceil, color=GRID, linewidth=9)
+        ax.hlines(0.6, p_floor, p_ceil, color="#3a3a48", linewidth=9)
         ax.text(
             (p_floor + p_ceil) / 2,
             0.15,
@@ -281,6 +302,11 @@ def _plays_like(ax: Axes, d: CardData, pid: str) -> None:
 
 
 def render(d: CardData, pid: str, path: Path) -> Path:
+    with plt.rc_context(DARK_RC):  # type: ignore[arg-type]
+        return _render(d, pid, path)
+
+
+def _render(d: CardData, pid: str, path: Path) -> Path:
     p, f, g = d.players.loc[pid], d.feats.loc[pid], d.grades.loc[pid]
     fig = plt.figure(figsize=(16, 10), facecolor=SURFACE)
     gs = GridSpec(
@@ -294,11 +320,11 @@ def render(d: CardData, pid: str, path: Path) -> Path:
     )
     head = fig.add_subplot(gs[0, :])
     head.axis("off")
-    head.text(0, 0.85, str(p["player_name"]), fontsize=26, fontweight="bold", color=TEXT, va="top")
+    head.text(0, 1.0, str(p["player_name"]), fontsize=28, fontweight="bold", color=TEXT, va="top")
     school = p.get("college_name") or p.get("pre_draft_org") or ""
     head.text(
         0,
-        0.2,
+        0.02,
         f"{int(p['draft_year'])} draft · pick #{int(p['pick_overall'])} · "
         f"{_team(p)} · {school} · age {_fmt(f['age_at_draft'], '.1f')} · "
         f"{_height(f['height_in'])}"
@@ -312,7 +338,7 @@ def render(d: CardData, pid: str, path: Path) -> Path:
         va="top",
     )
     head.text(
-        1, 0.85, "DRAFT DNA", fontsize=13, color=BLUE, fontweight="bold", ha="right", va="top"
+        1, 0.85, "DRAFT DNA", fontsize=13, color=HERO, fontweight="bold", ha="right", va="top"
     )
 
     main = fig.add_subplot(gs[1, 0:2])

@@ -1,0 +1,9 @@
+# Draft DNA app theme ("Apple meets superhero"): dark, Apple dark-mode accents.
+# Extra styling (glass panels, gradient headlines) lives in app/theme.py.
+[theme]
+base = "dark"
+primaryColor = "#0a84ff"
+backgroundColor = "#07070b"
+secondaryBackgroundColor = "#14141c"
+textColor = "#f5f5f7"
+font = "sans serif"

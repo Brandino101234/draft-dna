@@ -348,6 +348,8 @@ NBA early-career shot maps are projected into the same six college shot styles. 
 - **2026 tracker:** each rookie's season-value pace against his draft-night range
 - **About:** this writeup
 
+The app uses a dark "Apple meets superhero" theme (`.streamlit/config.toml` plus `app/theme.py`): Inter type, frosted-glass panels, a red-to-gold hero gradient, and chart colors checked for colorblind separation and contrast on the dark background. Prospect cards use a matching dark style with glowing shot maps.
+
 Every card has a shareable link (`?player=<id>`), and every page has its own (`?page=redraft&year=2011`).
 
 `make refresh` updates the tracker and every grade during the season.
