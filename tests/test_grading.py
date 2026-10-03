@@ -116,3 +116,35 @@ def test_parse_transactions_reads_team_codes_and_multi_team_trades() -> None:
     assert t["kind"].tolist() == ["drafted", "traded", "traded"]
     assert t["team_to"].tolist() == ["CHO", "LAC", "MIN"]
     assert t.loc[1, "team_from"] == "CHO"
+
+
+def test_class_metrics_curve_is_monotone_and_average_class_scores_zero() -> None:
+    import numpy as np
+    import pandas as pd
+
+    from draft_dna.grading import classes as C
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for year in range(1996, 2018):
+        for pick in range(1, 61):
+            v = max(0.0, 3.0 / pick**0.6 + rng.normal(0, 0.3))
+            rows.append(
+                {
+                    "bbref_id": f"{year}-{pick}",
+                    "player_name": f"p{pick}",
+                    "draft_year": year,
+                    "pick": pick,
+                    "current_median": v,
+                    "status": "Career Grade",
+                    "current_tier": "Starter",
+                    **{f"post_q{q:.2f}": v for q in np.arange(0.05, 0.951, 0.05)},
+                }
+            )
+    g = pd.DataFrame(rows)
+    curve = C.typical_curve(g)
+    assert (np.diff(curve["typical_peak"]) <= 1e-9).all()
+    strength = C.class_strength(g, curve)
+    assert abs(strength["strength"].mean()) < 1.0  # average class ~ 0
+    eq = C.equivalent_pick(pd.Series([10.0, curve["typical_peak"].iloc[9], 0.0]), curve)
+    assert eq.iloc[0] == 1 and eq.iloc[1] <= 10 and np.isnan(eq.iloc[2])

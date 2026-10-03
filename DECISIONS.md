@@ -357,3 +357,21 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Deep at position:** −0.004 (−0.039, +0.032).
 - **Coaching change:** −0.011 (−0.046, +0.023).
 - **Conclusion:** none of the team-level effects is detectable.
+
+### D037: Cross-class metrics (equivalent pick, all-time rank, class strength)
+
+**Problem:** a redraft ranks players within one class, so being #3 in 2003 and #3 in 2000 look identical.
+
+**Typical-career curve:** median and mean graded peak at each pick, from classes 1996–2017 (every career has 8+ seasons).
+- **Pooling:** neighboring picks are pooled with a window of round(0.2 × pick): #1–2 alone, ±1 for #3–7, up to ±12 at #60.
+- **Shape:** isotonic, so the curve never rises with pick number. Typical #1 = 2.98, #3 = 1.75, #10 = 0.72, #30 = 0.14, #50+ = 0.
+
+**Equivalent pick ("played like a typical #X"):** the earliest pick whose typical career a player matched. Examples: Jaylen Brown #3 → #2, Andrew Wiggins #1 → #2, Anthony Bennett #1 → #37.
+- **Saturation at #1:** anyone at or above a typical #1 (LeBron, Jokić, Isaiah Thomas) gets "#1 or better".
+- **All-time rank:** separates the top end by ranking every player's peak among all 1,833 picks.
+
+**Class strength:** Σ over a class's picks of (peak − mean peak at that pick); 0 = an average class.
+- **Unfinished careers** count at their *expected* (mean) peak, estimated from the quantile grid plus 2.5% tails. Using the median made every unfinished class look weak, because careers are skewed. With the mean, the undrafted-yet 2026 class scores +1.6 (+0.03 per player) and complete classes average −0.1.
+- **Split:** lottery (1–14) vs later (15–60) contributions.
+- **Ranking:** 2003 (+11.4), 2008 (+9.3, almost all from picks 15–60), 2009 (+9.3), 2018 (+9.1), 1999 (+8.9) top; 2000 (−14.3), 2016 (−11.9, busts at #4/#5/#8/#10/#13) and 2006 (−10.2) bottom.
+- **Provisional:** classes under 90% finished are flagged and move each season.
