@@ -148,6 +148,15 @@ def stage_league_averages(s: Settings) -> pd.DataFrame:
     return la[["season", *cols, "fg3a_rate"]].dropna(subset=["pace"])
 
 
+def stage_player_transactions(s: Settings) -> pd.DataFrame:
+    t = _raw("player_transactions", s)
+    t["date"] = pd.to_datetime(t["date"], errors="coerce")
+    # Multi-team deals read "As part of a 3-team trade, traded by ..." (lowercase).
+    multi = t["text"].str.contains(r"\btraded by\b", case=False, na=False)
+    t.loc[multi & (t["kind"] != "drafted"), "kind"] = "traded"
+    return t.dropna(subset=["date"]).sort_values(["bbref_id", "date"], kind="stable")
+
+
 def stage_player_salaries(s: Settings) -> pd.DataFrame:
     sal = _raw("player_salaries", s)
     sal["season"] = to_num(sal["season"].str.slice(0, 4)).astype("Int64") + 1
@@ -183,4 +192,6 @@ def run(s: Settings) -> None:
         write_table(stage_salary_cap(s), "staging", "bbref", "salary_cap", s)
     if table_path("raw", "bbref", "player_bios", s).exists():
         write_table(stage_player_bios(s), "staging", "bbref", "player_bios", s)
+    if table_path("raw", "bbref", "player_transactions", s).exists():
+        write_table(stage_player_transactions(s), "staging", "bbref", "player_transactions", s)
         write_table(stage_player_salaries(s), "staging", "bbref", "player_salaries", s)

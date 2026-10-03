@@ -40,6 +40,7 @@ TABLES: list[tuple[str, str, list[str] | None]] = [
             "draft_year",
             "pick_overall",
             "team_id",
+            "rights_team",
             "drafted",
             "college_name",
             "pre_draft_org",

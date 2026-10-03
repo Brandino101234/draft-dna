@@ -67,6 +67,14 @@ class CardData:
         )
 
 
+def _team(p: pd.Series) -> str:
+    """Team credited with the pick; draft-night trades show who actually got him."""
+    team, rights = p.get("team_id"), p.get("rights_team")
+    if isinstance(rights, str) and rights != team:
+        return f"picked by {team} for {rights}"
+    return str(team)
+
+
 def _height(inches: object) -> str:
     if inches is None or pd.isna(inches):
         return "height ?"
@@ -292,7 +300,7 @@ def render(d: CardData, pid: str, path: Path) -> Path:
         0,
         0.2,
         f"{int(p['draft_year'])} draft · pick #{int(p['pick_overall'])} · "
-        f"{p['team_id']} · {school} · age {_fmt(f['age_at_draft'], '.1f')} · "
+        f"{_team(p)} · {school} · age {_fmt(f['age_at_draft'], '.1f')} · "
         f"{_height(f['height_in'])}"
         + (
             f" · {str(f['position']).capitalize()}"

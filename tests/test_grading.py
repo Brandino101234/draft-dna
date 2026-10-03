@@ -86,3 +86,33 @@ def test_recruit_groups_treat_missing_rank_as_unranked() -> None:
         "RSCI 51-100",
         "Unranked",
     ]
+
+
+def test_rights_team_follows_trade_chain_from_current_holder() -> None:
+    import pandas as pd
+
+    from draft_dna.modeled.integrate import rights_team
+
+    trades = pd.DataFrame({"team_from": ["LAL", "NYK", "OKC"], "team_to": ["OKC", "BOS", "MIN"]})
+    # LAL -> OKC -> MIN; the NYK -> BOS leg belongs to someone else in a multi-team deal.
+    assert rights_team("LAL", trades) == "MIN"
+    assert rights_team("CLE", trades.iloc[0:0]) == "CLE"
+
+
+def test_parse_transactions_reads_team_codes_and_multi_team_trades() -> None:
+    from draft_dna.ingest.bbref import parse_transactions
+
+    html = b"""<div id="div_transactions">
+    <p class="transaction "><strong>June 21, 2018</strong>: Drafted by the
+      <a data-attr-to="CHO" href="#">Charlotte Hornets</a>.</p>
+    <p class="transaction "><strong>June 21, 2018</strong>: Traded by the
+      <a data-attr-from="CHO" href="#">Hornets</a> to the
+      <a data-attr-to="LAC" href="#">Clippers</a>.</p>
+    <p class="transaction "><strong>November 20, 2020</strong>: As part of a 3-team trade, traded by
+      the <a data-attr-from="OKC" href="#">Thunder</a> to the
+      <a data-attr-to="MIN" href="#">Wolves</a>.</p>
+    </div>"""
+    t = parse_transactions(html, "x")
+    assert t["kind"].tolist() == ["drafted", "traded", "traded"]
+    assert t["team_to"].tolist() == ["CHO", "LAC", "MIN"]
+    assert t.loc[1, "team_from"] == "CHO"

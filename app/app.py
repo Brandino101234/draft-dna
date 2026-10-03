@@ -395,8 +395,10 @@ elif page == "teams":
     st.subheader("Team draft report cards")
     st.caption(
         "How each franchise's picks did against their draft slot. Phase 6 found these "
-        "differences are no bigger than luck would produce (p = 0.92), so read this as a "
-        "history of outcomes, not of drafting skill. Team = the team that made the pick."
+        "differences are no bigger than luck would produce (p = 0.85), so read this as a "
+        "history of outcomes, not of drafting skill. Team = the team that got the player: "
+        "picks traded on draft night count for the acquiring team (Shai: Clippers, not "
+        "Charlotte)."
     )
     c1, c2 = st.columns([2, 1])
     with c1:

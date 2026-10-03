@@ -36,6 +36,52 @@ def players(s: Settings) -> pd.DataFrame:
         labels=["training", "in_progress", "live"],
     ).astype("string")
     xw.loc[~xw["drafted"], "draft_class_role"] = "undrafted"
+    return add_rights_team(xw, s)
+
+
+def rights_team(drafted_by: str, trades: pd.DataFrame) -> str:
+    """Follow pre-season trades from the drafting team. A trade counts only if it moves
+    the player away from the team currently holding him (guards multi-team trade text)."""
+    team = drafted_by
+    for frm, to in zip(trades["team_from"], trades["team_to"], strict=True):
+        if frm == team and isinstance(to, str):
+            team = to
+    return team
+
+
+def add_rights_team(xw: pd.DataFrame, s: Settings) -> pd.DataFrame:
+    """`rights_team`: the team that held a pick when his first season began. Draft-night
+    trades (and deals agreed then but completed in July) credit the acquiring team: Shai
+    Gilgeous-Alexander was picked by Charlotte for the Clippers. `team_id` stays the team
+    that made the pick."""
+    xw["rights_team"] = xw["team_id"]
+    xw["traded_before_debut"] = False
+    if not table_path("staging", "bbref", "player_transactions", s).exists():
+        return xw
+    tx = read_table("staging", "bbref", "player_transactions", s)
+    drafted_on = tx[tx["kind"] == "drafted"].groupby("bbref_id")["date"].min()
+    tx = tx[tx["kind"] == "traded"]
+    start = tx["bbref_id"].map(drafted_on)
+    # Before his first season: through Sept 30 for a June draft; the 2020 draft was held in
+    # November, a month before its season began.
+    end = start.map(
+        lambda d: (
+            d + pd.Timedelta(days=30)
+            if d.month >= 10
+            else pd.Timestamp(d.year, 10, 1)
+            if pd.notna(d)
+            else pd.NaT
+        )
+    )
+    tx = tx[(tx["date"] >= start) & (tx["date"] < end)]
+    teams = xw.set_index("bbref_id")["team_id"]
+    moved = {
+        pid: rights_team(teams.get(pid), g)
+        for pid, g in tx.groupby("bbref_id")
+        if pid in teams.index and isinstance(teams.get(pid), str)
+    }
+    xw["rights_team"] = xw["bbref_id"].map(moved).fillna(xw["team_id"])
+    xw["traded_before_debut"] = xw["drafted"] & (xw["rights_team"] != xw["team_id"])
     return xw
 
 
