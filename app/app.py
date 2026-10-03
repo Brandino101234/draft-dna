@@ -27,6 +27,7 @@ if not (ROOT / "data" / "modeled" / "grading" / "grades.parquet").exists():
     os.environ.setdefault("DRAFT_DNA_MODELED", str(ROOT / "app" / "bundle"))
 
 from draft_dna.config import get_settings  # noqa: E402
+from draft_dna.grading import classes as C  # noqa: E402
 from draft_dna.ingest.storage import read_table  # noqa: E402
 from draft_dna.viz import cards as card_viz  # noqa: E402
 
@@ -37,6 +38,7 @@ CARD_DIR = LOCAL_CARDS if LOCAL_CARDS.exists() else Path(tempfile.gettempdir()) 
 PAGES = {
     "player": "Player card",
     "redraft": "Redraft",
+    "classes": "Draft classes",
     "steals": "Steals & busts",
     "teams": "Teams",
     "recruits": "Recruits",
@@ -99,6 +101,12 @@ grades["redraft"] = (
     .add(1)
 )
 grades["moved"] = (grades["pick"] - grades["redraft"]).astype(int)
+# Cross-class scale (D037): which pick's typical career he matched, and all-time rank.
+CURVE = C.typical_curve(grades)
+grades["equiv_pick"] = C.equivalent_pick(grades["current_median"], CURVE)
+grades["played_like"] = grades["equiv_pick"].map(C.equivalent_pick_label)
+grades["all_time_rank"] = C.all_time_rank(grades)
+CLASSES = C.class_strength(grades, CURVE)
 G = grades.set_index("bbref_id")
 options = {label(r): r["bbref_id"] for _, r in grades.iterrows()}
 label_of = {v: k for k, v in options.items()}
@@ -148,6 +156,12 @@ def year_range(key: str, default: tuple[int, int] = (1996, 2026)) -> tuple[int, 
 # ----------------------------------------------------------------------- navigation
 qp = st.query_params
 slugs = list(PAGES)
+to_class = st.session_state.pop("goto_class", None)
+if to_class is not None:  # clicked a class on the Draft classes page
+    qp.clear()
+    qp["page"], qp["year"] = "redraft", str(to_class)
+    st.session_state["nav"] = PAGES["redraft"]
+    st.session_state["rd_year"] = int(to_class)
 target = st.session_state.pop("goto", None)
 if target is None and "nav" not in st.session_state and qp.get("player") in G.index:
     target = qp.get("player")  # first load from a shared ?player= link
@@ -193,6 +207,12 @@ def summary(pid: str) -> None:
         "Confidence",
         f"{g['confidence']:.0%}",
         help="How much the range has narrowed since draft night (100% = career done).",
+    )
+    so_far = "" if g["finished"] else " so far (projected)"
+    st.caption(
+        f"Played like a typical **{g['played_like']}** pick{so_far} · all-time rank "
+        f"**{int(g['all_time_rank'])}** of {len(G):,} picks since 1996 (by career peak). "
+        "Both compare across draft classes, unlike the redraft."
     )
 
 
@@ -295,7 +315,9 @@ elif page == "redraft":
     years = sorted(grades["draft_year"].unique(), reverse=True)
     q_year = qp.get("year")
     default_year = int(q_year) if q_year and q_year.isdigit() and int(q_year) in years else 2011
-    year = st.selectbox("Draft class", years, index=years.index(default_year))
+    if "rd_year" not in st.session_state:
+        st.session_state["rd_year"] = default_year
+    year = st.selectbox("Draft class", years, key="rd_year")
     qp["year"] = str(year)
     cls = grades[grades["draft_year"] == year].copy()
     if not cls["finished"].all():
@@ -329,6 +351,8 @@ elif page == "redraft":
                 "player_name",
                 "pick",
                 "moved",
+                "played_like",
+                "all_time_rank",
                 "grade",
                 "current_tier",
                 "current_median",
@@ -341,9 +365,76 @@ elif page == "redraft":
             "moved": st.column_config.NumberColumn("Moved", format="%+d"),
             "current_tier": "Tier",
             "current_median": st.column_config.NumberColumn("Peak value", format="%.2f"),
+            "played_like": "Played like",
+            "all_time_rank": st.column_config.NumberColumn("All-time rank", format="%d"),
         },
     )
-    st.caption("Click a row to open that player's card.")
+    strength = CLASSES.set_index("draft_year").loc[year]
+    st.caption(
+        f"Click a row to open that player's card. Redraft order is within this class; "
+        f"'Played like' and 'All-time rank' compare across classes. The {year} class ranks "
+        f"#{int(strength['rank'])} of {len(CLASSES)} by strength (Draft classes page)."
+    )
+
+elif page == "classes":
+    st.subheader("Draft classes: which drafts were strongest?")
+    st.caption(
+        "Strength = total career peak a class produced minus what an average class produces "
+        "from the same 60 picks (0 = an average draft; positive = stronger). Unfinished "
+        "careers count at their expected peak, so recent classes (lighter bars) are "
+        "provisional and move toward reality each season. Stars = All-Star tier or better; "
+        "starters+ = Starter tier or better."
+    )
+    cl = CLASSES.sort_values("draft_year")
+    cl["status"] = np.where(cl["provisional"], "provisional", "complete")
+    fig = px.bar(
+        cl,
+        x="draft_year",
+        y="strength",
+        color="status",
+        color_discrete_map={"complete": "#2a78d6", "provisional": "#a9c8ee"},
+        hover_data={"best_player": True, "stars": True, "starters_plus": True},
+        labels={"draft_year": "Draft class", "strength": "Value vs an average class"},
+        height=420,
+    )
+    fig.add_hline(y=0, line_color="#52514e", line_width=1)
+    st.plotly_chart(fig, width="stretch")
+    table = CLASSES.sort_values("rank")[
+        [
+            "rank",
+            "draft_year",
+            "strength",
+            "lottery",
+            "later_picks",
+            "stars",
+            "starters_plus",
+            "best_player",
+            "provisional",
+        ]
+    ]
+    event = st.dataframe(
+        table,
+        hide_index=True,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="single-row",
+        key="classes_table",
+        column_config={
+            "rank": "#",
+            "draft_year": st.column_config.NumberColumn("Class", format="%d"),
+            "strength": st.column_config.NumberColumn("Strength", format="%+.1f"),
+            "lottery": st.column_config.NumberColumn("From picks 1-14", format="%+.1f"),
+            "later_picks": st.column_config.NumberColumn("From picks 15-60", format="%+.1f"),
+            "stars": "Stars",
+            "starters_plus": "Starters+",
+            "best_player": "Best player",
+            "provisional": "Provisional",
+        },
+    )
+    if event.selection.rows:  # type: ignore[attr-defined]
+        st.session_state["goto_class"] = int(table.iloc[event.selection.rows[0]]["draft_year"])  # type: ignore[attr-defined]
+        st.rerun()
+    st.caption("Click a class to open its redraft.")
 
 elif page == "steals":
     st.subheader("Steals and busts: who should have gone much higher, or much lower")
@@ -368,10 +459,12 @@ elif page == "steals":
         "pick",
         "redraft",
         "moved",
+        "played_like",
         "grade",
         "value_vs_slot",
     ]
     cfg = {
+        "played_like": "Played like",
         "draft_year": st.column_config.NumberColumn("Year", format="%d"),
         "pick": "Drafted #",
         "redraft": "Redraft #",
