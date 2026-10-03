@@ -40,6 +40,7 @@ S = get_settings()
 LOCAL_CARDS = S.paths.modeled / "cards"
 CARD_DIR = LOCAL_CARDS if LOCAL_CARDS.exists() else Path(tempfile.gettempdir()) / "draft_dna_cards"
 PAGES = {
+    "home": "Home",
     "player": "Player card",
     "redraft": "Redraft",
     "classes": "Draft classes",
@@ -49,6 +50,7 @@ PAGES = {
     "compare": "Compare",
     "styles": "Style map",
     "tracker": "2026 tracker",
+    "accuracy": "How accurate is it?",
     "about": "About",
 }
 GRADE_HELP = (
@@ -70,6 +72,10 @@ def load() -> dict[str, pd.DataFrame]:
         "recruits": read_table("modeled", "recruits", "players", S),
         "recruit_summary": read_table("modeled", "recruits", "summary", S),
         "recruit_tests": read_table("modeled", "recruits", "tests", S),
+        "acc_models": read_table("modeled", "accuracy", "models", S),
+        "acc_calibration": read_table("modeled", "accuracy", "calibration", S),
+        "acc_allstar": read_table("modeled", "accuracy", "allstar_reliability", S),
+        "acc_sharpening": read_table("modeled", "accuracy", "sharpening", S),
     }
 
 
@@ -160,6 +166,11 @@ def year_range(key: str, default: tuple[int, int] = (1996, 2026)) -> tuple[int, 
 # ----------------------------------------------------------------------- navigation
 qp = st.query_params
 slugs = list(PAGES)
+to_page = st.session_state.pop("goto_page", None)
+if to_page is not None:  # buttons on the home page
+    qp.clear()
+    qp["page"] = to_page
+    st.session_state["nav"] = PAGES[to_page]
 to_class = st.session_state.pop("goto_class", None)
 if to_class is not None:  # clicked a class on the Draft classes page
     qp.clear()
@@ -176,8 +187,8 @@ if target is not None:
     st.session_state["pc_year"] = int(G.loc[target, "draft_year"])
     st.session_state["pc_player"] = label_of[target]
 elif "nav" not in st.session_state:
-    start = qp.get("page", "player")
-    st.session_state["nav"] = PAGES.get(start, PAGES["player"])
+    start = qp.get("page", "home")
+    st.session_state["nav"] = PAGES.get(start, PAGES["home"])
 theme.brand()
 page_name = st.sidebar.radio("View", list(PAGES.values()), key="nav")
 page = slugs[list(PAGES.values()).index(page_name)]
@@ -197,6 +208,7 @@ def summary(pid: str) -> None:
         g["current_tier"],
         delta=f"draft night: {g['projected_tier']}",
         delta_color="off",
+        delta_arrow="off",
         help="Tier of the median projected peak (or the actual peak once his career is done).",
     )
     c4.metric(
@@ -220,7 +232,300 @@ def summary(pid: str) -> None:
 
 
 # ----------------------------------------------------------------------- pages
-if page == "player":
+def go_page(slug: str) -> None:
+    st.session_state["goto_page"] = slug
+    st.rerun()
+
+
+def page_button(label: str, slug: str, key: str) -> None:
+    if st.button(label, key=key, type="secondary"):
+        go_page(slug)
+
+
+if page == "home":
+    n_picks = len(G)
+    acc = data["acc_models"].set_index("model").loc["Pick only + conformal"]
+    inside = 1 - acc["below_floor"] - acc["above_ceiling"]
+    best = CLASSES.sort_values("rank").iloc[0]
+    sharp = data["acc_sharpening"].set_index("seasons")["crps"]
+    rec = data["recruit_tests"].set_index(["horizon", "scope"]).loc[(4, "all picks")]
+    theme.hero(
+        "NBA draft analytics · 1996-2026",
+        "What was expected. What actually happened.",
+        f"Every one of the {n_picks:,} NBA draft picks since 1996, projected from draft "
+        "night only, then graded season by season as careers unfold. Honest backtests, "
+        "pre-registered tests, and no hindsight in the projections.",
+    )
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Picks graded", f"{n_picks:,}", help="Both rounds, 1996-2026 drafts.")
+    c2.metric(
+        "Careers inside the range",
+        f"{inside:.0%}",
+        delta="target 65%",
+        delta_color="off",
+        delta_arrow="off",
+        help="Held-out 2013-2020 picks finishing between the projected floor (25th "
+        "percentile) and ceiling (90th).",
+    )
+    c3.metric(
+        "Strongest draft",
+        str(int(best["draft_year"])),
+        delta=f"{best['strength']:+.1f} vs an average class",
+        delta_color="off",
+        delta_arrow="off",
+    )
+    c4.metric(
+        "Forecast error by year 7",
+        f"-{1 - sharp.loc[7] / sharp.loc[0]:.0%}",
+        delta="vs draft night",
+        delta_color="off",
+        delta_arrow="off",
+        help="How much the range tightens as real seasons replace the projection (CRPS).",
+    )
+    st.markdown("### What the data says")
+    findings = [
+        (
+            "Draft position is the forecast to beat",
+            "College box scores, comps, gradient boosting and a Bayesian model all tied or "
+            "lost to how the same draft slots worked out historically.",
+            "How accurate is it?",
+            "accuracy",
+        ),
+        (
+            "How a prospect scores adds nothing",
+            "Shot location and style (where, how, assisted or not) had no detectable value "
+            "once draft slot and stats were known.",
+            "Style map",
+            "styles",
+        ),
+        (
+            "Teams already price in recruiting rank",
+            f"Top-10 high-school recruits go about 20 picks earlier, then match their slot "
+            f"(rho = {rec['spearman_rho']:+.2f}, p = {rec['p_value']:.2f}).",
+            "Recruits",
+            "recruits",
+        ),
+        (
+            f"{int(best['draft_year'])} was the best draft",
+            f"{best['best_player']} led a class worth {best['strength']:+.1f} over an average "
+            "draft. 2000 and 2016 sit at the bottom.",
+            "Draft classes",
+            "classes",
+        ),
+        (
+            "No team drafts better than luck",
+            "Franchise differences against draft slot are no bigger than chance produces, "
+            "crediting draft-night trades to the team that got the player.",
+            "Teams",
+            "teams",
+        ),
+        (
+            "Steals hide everywhere",
+            "Isaiah Thomas (#60), Manu Ginobili (#57) and Marc Gasol (#48) played like top-2 "
+            "picks; Thabeet and Bennett went the other way.",
+            "Steals & busts",
+            "steals",
+        ),
+    ]
+    for row in range(0, len(findings), 3):
+        cols = st.columns(3)
+        for col, (title, body, button, slug) in zip(cols, findings[row : row + 3], strict=False):
+            with col.container(border=True):
+                st.markdown(f"**{title}**")
+                st.caption(body)
+                page_button(f"{button} →", slug, key=f"home_{slug}")
+    st.markdown("### Featured prospects")
+    featured = [p for p in ("dybanaj01", "flaggco01", "wembavi01") if p in G.index]
+    cols = st.columns(len(featured))
+    for col, pid in zip(cols, featured, strict=True):
+        with col:
+            sample = ROOT / "reports" / "cards" / f"{pid}.png"
+            st.image(str(sample if sample.exists() else card_path(pid)), width="stretch")
+            g = G.loc[pid]
+            st.caption(
+                f"**{g['player_name']}** · {int(g['draft_year'])} #{int(g['pick'])} · "
+                f"{g['current_tier']} projected"
+            )
+            if st.button("Open card →", key=f"feat_{pid}"):
+                go_to_player(pid)
+    st.caption(
+        "Method: draft-slot history with conformal calibration on draft night, then Bayesian "
+        "updating as seasons are played. Full write-up on the About page."
+    )
+
+elif page == "accuracy":
+    models = data["acc_models"]
+    cal = data["acc_calibration"]
+    allstar = data["acc_allstar"]
+    sharp = data["acc_sharpening"]
+    rec_row = models.set_index("model").loc["Pick only + conformal"]
+    theme.hero(
+        "How accurate is it?",
+        "Judged only on players it never saw",
+        "Every number on this page comes from the 2013-2020 draft classes, predicted by models "
+        "trained only on earlier drafts and never used to choose a model. Outcome: best "
+        "3-season stretch through year 6.",
+    )
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "Finished below the floor",
+        f"{rec_row['below_floor']:.1%}",
+        delta="target 25%",
+        delta_color="off",
+        delta_arrow="off",
+    )
+    c2.metric(
+        "Finished above the ceiling",
+        f"{rec_row['above_ceiling']:.1%}",
+        delta="target 10%",
+        delta_color="off",
+        delta_arrow="off",
+    )
+    c3.metric(
+        "Inside the range",
+        f"{1 - rec_row['below_floor'] - rec_row['above_ceiling']:.1%}",
+        delta="target 65%",
+        delta_color="off",
+        delta_arrow="off",
+    )
+    c4.metric("Held-out players", f"{int(cal['n'].iloc[0])}")
+
+    st.markdown("### Are the ranges honest?")
+    st.caption(
+        "For every predicted percentile, the share of careers that actually finished below "
+        "it. On the dotted line = perfectly calibrated. The floor (25th), median and ceiling "
+        "(90th) land almost exactly on target. The lowest percentiles sit above the line "
+        "because many careers end at exactly zero value (out of the league), which a smooth "
+        "range can't split finely."
+    )
+    fig = px.line(
+        cal,
+        x="level",
+        y="observed",
+        markers=True,
+        labels={"level": "Predicted percentile", "observed": "Share of careers below it"},
+        height=420,
+    )
+    fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line={"dash": "dot", "color": theme.MUTED})
+    for lvl, name in ((0.25, "floor"), (0.5, "median"), (0.9, "ceiling")):
+        obs = float(cal.loc[(cal["level"] - lvl).abs().idxmin(), "observed"])
+        fig.add_annotation(
+            x=lvl,
+            y=obs,
+            text=f"{name}: {obs:.0%}",
+            showarrow=True,
+            arrowhead=0,
+            ax=40,
+            ay=-30,
+            font={"color": theme.TEXT},
+        )
+    fig.update_traces(line={"width": 3, "color": theme.BLUE}, marker={"size": 8})
+    fig.update_layout(
+        xaxis={"tickformat": ".0%", "range": [0, 1]}, yaxis={"tickformat": ".0%", "range": [0, 1]}
+    )
+    st.plotly_chart(fig, width="stretch")
+
+    st.markdown("### Does anything beat draft position?")
+    st.caption(
+        "Forecast error (CRPS, lower is better) for every model, held out. Bars show the "
+        "difference from plain draft-slot history with a 95% interval: nothing is reliably "
+        "better, and stats-only models are reliably worse. So the simplest model ships."
+    )
+    m = models.copy()
+    m["diff"] = m["crps_vs_pick"]
+    m["err_hi"] = m["crps_vs_pick_hi"] - m["diff"]
+    m["err_lo"] = m["diff"] - m["crps_vs_pick_lo"]
+    m = m.sort_values("diff", ascending=False)
+    fig = px.bar(
+        m,
+        x="diff",
+        y="label",
+        orientation="h",
+        error_x="err_hi",
+        error_x_minus="err_lo",
+        labels={"diff": "Extra forecast error vs draft slot (lower is better)", "label": ""},
+        height=380,
+    )
+    fig.update_traces(
+        marker_color=[
+            theme.BLUE if "model of record" in lbl else "rgba(10,132,255,0.35)"
+            for lbl in m["label"]
+        ]
+    )
+    fig.add_vline(x=0, line_color=theme.MUTED, line_width=1)
+    st.plotly_chart(fig, width="stretch")
+
+    st.markdown("### The forecast sharpens as seasons are played")
+    st.caption(
+        "Forecast error of the year-8 career peak after N seasons, on held-out 2011-2018 "
+        "picks. Each season of real play replaces more of the draft-night guess."
+    )
+    s2 = sharp.assign(weight=sharp["data_weight"].map(lambda w: f"{w:.0%} real data"))
+    fig = px.line(
+        s2,
+        x="seasons",
+        y="crps",
+        markers=True,
+        text="weight",
+        height=380,
+        labels={"seasons": "Seasons played", "crps": "Forecast error (CRPS)"},
+    )
+    fig.update_traces(
+        line={"width": 3, "color": theme.BLUE},
+        marker={"size": 9},
+        textposition="top center",
+        textfont={"color": theme.TEXT_2, "size": 11},
+    )
+    fig.update_layout(xaxis={"range": [-0.4, 7.6], "dtick": 1})
+    st.plotly_chart(fig, width="stretch")
+
+    st.markdown("### Where it misses: All-Star odds for top picks run high")
+    st.caption(
+        "Predicted chance of an All-Star-or-better career vs how often it happened. Low "
+        "odds are accurate; when the model gave a 35-50% chance (top picks), only about 1 "
+        "in 6 got there in the 2013-2020 drafts. Treat high All-Star odds as optimistic."
+    )
+    nice = {
+        "(-0.001, 0.05]": "0-5%",
+        "(0.05, 0.1]": "5-10%",
+        "(0.1, 0.2]": "10-20%",
+        "(0.2, 0.35]": "20-35%",
+        "(0.35, 0.5]": "35-50%",
+        "(0.5, 1.0]": "50%+",
+    }
+    a = allstar.assign(bucket=allstar["bin"].map(nice).fillna(allstar["bin"]))
+    a = a.melt(
+        id_vars=["bucket", "n"],
+        value_vars=["predicted", "observed"],
+        var_name="series",
+        value_name="share",
+    )
+    a["series"] = a["series"].map({"predicted": "Predicted", "observed": "Actually happened"})
+    fig = px.bar(
+        a,
+        x="bucket",
+        y="share",
+        color="series",
+        barmode="group",
+        height=380,
+        text=a["share"].map(lambda v: f"{v:.0%}"),
+        color_discrete_map={"Predicted": theme.BLUE, "Actually happened": theme.HERO_GOLD},
+        labels={"bucket": "Predicted chance of All-Star or better", "share": "", "series": ""},
+        hover_data={"n": True},
+    )
+    fig.update_traces(textposition="outside", textfont={"color": theme.TEXT_2})
+    fig.update_layout(
+        yaxis={"tickformat": ".0%", "range": [0, 0.65]},
+        legend={"orientation": "h", "y": 1.12, "x": 0, "title": ""},
+        bargap=0.25,
+    )
+    st.plotly_chart(fig, width="stretch")
+    st.caption(
+        "Full method and every model's numbers: DECISIONS D020-D024 and D031-D034 in the "
+        "repository, and the About page."
+    )
+
+elif page == "player":
     years = sorted(grades["draft_year"].unique(), reverse=True)
     c_year, c_player = st.columns([1, 3])
     year = c_year.selectbox("Draft class", ["All years", *years], key="pc_year")

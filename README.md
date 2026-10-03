@@ -336,7 +336,9 @@ Each card shows the prospect's college shot map next to his top-3 comps' maps. I
 NBA early-career shot maps are projected into the same six college shot styles. Each prospect gets the five nearest NBA players by style mix, within 3 inches of his height. This is a description of shot diet only: Phase 5 showed style doesn't predict success.
 
 ### The app
-`make app` opens a Streamlit app with ten pages:
+`make app` opens a Streamlit app with twelve pages:
+- **Home:** the headline findings in ten seconds, with links into each page and featured prospects
+- **How accurate is it?:** held-out calibration (23.6% below floor, 9.8% above ceiling), every model vs draft slot, how the forecast sharpens by season, and where it misses (All-Star odds for top picks run high)
 - **Player card:** pick a draft class or type a name; card, plain-language tier and All-Star odds, comps (click one to open its card) and the whole class
 - **Redraft:** any class re-ordered by how careers turned out (2011: Kawhi, Butler, Kyrie, Isaiah Thomas from #60), with cross-class columns: *played like a typical #X pick* and *all-time rank*
 - **Draft classes:** which drafts were strongest. Each class's total value against an average class from the same picks, split into lottery vs later picks (2003, 2008 and 2009 lead; 2000 and 2016 trail)

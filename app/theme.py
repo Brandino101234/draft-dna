@@ -123,6 +123,28 @@ p, li {{ color: {TEXT}; }}
   border: 1px solid {LINE}; box-shadow: 0 30px 80px -40px rgba(10,132,255,0.45);
 }}
 
+/* Bordered containers (home findings): glass panels */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {{
+  border-radius: 18px !important; border-color: {LINE} !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}}
+[data-testid="stVerticalBlockBorderWrapper"]:hover {{
+  border-color: rgba(10,132,255,0.45) !important;
+  box-shadow: 0 16px 40px -24px rgba(10,132,255,0.6);
+}}
+
+/* Buttons: pill, quiet until hovered, then the hero gradient */
+.stButton > button {{
+  border-radius: 999px; border: 1px solid {LINE}; background: rgba(255,255,255,0.04);
+  color: {TEXT}; font-weight: 600; padding: 0.35rem 1rem; transition: all 0.18s ease;
+}}
+.stButton > button:hover {{
+  border-color: transparent; color: #fff;
+  background: linear-gradient(90deg, {HERO_RED}, {HERO_GOLD});
+  box-shadow: 0 8px 24px -10px rgba(255,55,95,0.6);
+}}
+
 /* Inputs: soft, rounded */
 [data-baseweb="select"] > div, [data-baseweb="input"] > div {{
   border-radius: 12px !important; background: {SURFACE} !important; border-color: {LINE} !important;

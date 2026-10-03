@@ -110,6 +110,9 @@ def grade() -> None:
     grading.run(s)
     extras.run(s)
     write_table(tracker.rookie_tracker(s), "modeled", "grading", "rookie_tracker", s)
+    from draft_dna.eval import accuracy
+
+    accuracy.run(s)
     db.load(s)
 
 
