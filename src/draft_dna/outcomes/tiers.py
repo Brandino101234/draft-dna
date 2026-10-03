@@ -26,6 +26,22 @@ from draft_dna.eval import metrics as M
 from draft_dna.ingest.storage import table_path
 
 TIERS = ["Out of league", "Bust", "Rotation", "Starter", "All-Star", "All-NBA"]
+# Honor tiers above All-NBA (D039): earned, not projected, so they sit outside the
+# value-cutoff tiers that projections and tier probabilities use.
+HONOR_TIERS = ["Superstar", "MVP", "Legend"]
+ALL_TIERS = TIERS + HONOR_TIERS
+
+
+def honor_tier(all_nba: float, first_team: float, mvps: float) -> str | None:
+    """Legend: 2+ MVPs or 10+ All-NBA selections. MVP: won one. Superstar: 2+ All-NBA
+    First Team selections. None otherwise."""
+    if mvps >= 2 or all_nba >= 10:
+        return "Legend"
+    if mvps >= 1:
+        return "MVP"
+    if first_team >= 2:
+        return "Superstar"
+    return None
 
 
 def role_anchor(row: pd.Series) -> int:

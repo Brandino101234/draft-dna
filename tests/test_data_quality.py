@@ -464,3 +464,23 @@ def test_draft_night_trades_credit_the_acquiring_team(con) -> None:
     assert p.loc["jamesle01", "rights_team"] == "CLE"  # no draft-night trade
     share = (p.loc[p["drafted"], "rights_team"] != p.loc[p["drafted"], "team_id"]).mean()
     assert 0.15 < share < 0.40
+
+
+def test_finished_star_tiers_require_actual_selections(con) -> None:
+    g = q(
+        con,
+        """SELECT g.bbref_id, g.current_tier, o.all_star_selections, o.all_nba_selections
+           FROM modeled.grading__grades g
+           JOIN (SELECT bbref_id, max(all_star_selections) AS all_star_selections,
+                        max(all_nba_selections) AS all_nba_selections
+                 FROM modeled.outcomes__outcomes_through_n GROUP BY bbref_id) o
+             USING (bbref_id)
+           WHERE g.status LIKE 'Career%'""",
+    )
+    assert len(g) > 1000
+    star = g["current_tier"].isin(["All-Star", "All-NBA", "Superstar", "MVP", "Legend"])
+    assert (
+        (g.loc[star, "all_star_selections"] >= 1) | (g.loc[star, "all_nba_selections"] >= 1)
+    ).all()
+    nba = g["current_tier"].isin(["All-NBA", "Superstar", "MVP", "Legend"])
+    assert (g.loc[nba, "all_nba_selections"] >= 1).all()

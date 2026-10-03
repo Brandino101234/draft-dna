@@ -29,8 +29,8 @@ from sklearn.isotonic import IsotonicRegression
 REFERENCE_LAST_CLASS = 2017  # every career in these classes has 8+ seasons
 MAX_PICK = 60
 LOTTERY = 14
-STAR_TIERS = ("All-Star", "All-NBA")
-STARTER_TIERS = ("Starter", "All-Star", "All-NBA")
+STAR_TIERS = ("All-Star", "All-NBA", "Superstar", "MVP", "Legend")
+STARTER_TIERS = ("Starter", *STAR_TIERS)
 
 
 def _window(pick: int) -> int:

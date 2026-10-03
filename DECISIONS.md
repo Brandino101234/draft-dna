@@ -394,3 +394,22 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Why:** with 115 training players (the 2005 class learns only from 1996–97), k = 60 averaged a #1 pick with picks down to ~#30, and all of 2005's top 5 got identical projections (median 0.75, bust risk 38%).
 - **Effect:** 2005 top-5 bust risk is now 12% (in line with other years) and medians differ by slot.
 - **Validation:** unchanged (fit ≤ 2010 has large n). The as-of finished-career mix is A 9.1 / B 36.4 / C 30.3 / D 24.1%.
+
+### D039: Earned tiers for finished careers; honor tiers above All-NBA
+
+**Problem:** tiers were value cutoffs (D017) with accolade *floors*, so value alone could carry a player into All-Star or All-NBA tier without a selection.
+- 62 finished careers were labeled All-Star or All-NBA with no All-Star selection, including Jason Terry, Tayshaun Prince, Kerry Kittles and Mike Bibby. Several are role players on deep playoff teams lifted by playoff value (D033).
+- 15 All-Stars were labeled All-NBA without an All-NBA selection.
+
+**Rule for finished careers** (8+ seasons or retired): the label is capped by selections.
+- **All-NBA tier** requires an All-NBA selection.
+- **All-Star tier** requires an All-Star selection.
+- **Otherwise:** at most Starter.
+- **Unchanged:** projections and in-progress forecasts keep the value tiers, so "Projected tier: All-Star" means expected to become one. Grades (value vs slot) don't change, because the label isn't the value. A DPOY's value floor (D034) still counts toward the grade, but his tier label is Starter without an All-Star selection.
+
+**Honor tiers above All-NBA:** these are earned, never projected, and come from career-to-date honors, so active players qualify.
+- **Superstar:** 2+ All-NBA First Team selections. 7 players: McGrady, Wade, Howard, Kawhi, Davis, Tatum, Dončić.
+- **MVP:** won an MVP. 5 players: Iverson, Rose, Westbrook, Harden, Embiid.
+- **Legend:** 2+ MVPs or 10+ All-NBA selections. 11 players: Kobe, Nash, Duncan, Dirk, LeBron, Paul, Durant, Curry, Giannis, Jokić, SGA.
+- **Not used:** Finals MVP isn't in the data (D033).
+- **How they're used:** class-strength star counts include the honor tiers, and cards show the honor on the All-NBA bar.
