@@ -9,8 +9,10 @@ Links: `?player=<bbref_id>` opens a player's card; `?page=redraft&year=2011` etc
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -26,6 +28,31 @@ sys.path.insert(0, str(ROOT / "src"))  # deployed app: package not installed
 if not (ROOT / "data" / "modeled" / "grading" / "grades.parquet").exists():
     os.environ.setdefault("DRAFT_DNA_MODELED", str(ROOT / "app" / "bundle"))
 
+
+def _code_and_data_changed() -> bool:
+    """Streamlit Cloud reruns app.py after a git push but keeps already-imported modules
+    and cached data in memory, so new code could call old modules (AttributeError) and a
+    refreshed bundle could keep showing old numbers. Fingerprint the project code and the
+    data bundle; when they change, drop the stale modules (the caches are cleared below)."""
+    watched = [
+        *(ROOT / "src" / "draft_dna").rglob("*.py"),
+        ROOT / "app" / "theme.py",
+        *(ROOT / "app" / "bundle").rglob("*.parquet"),
+    ]
+    sig = hashlib.sha1(
+        "|".join(f"{p}:{p.stat().st_mtime_ns}:{p.stat().st_size}" for p in sorted(watched)).encode()
+    ).hexdigest()
+    previous = os.environ.get("DRAFT_DNA_CODE_DATA_SIG")
+    os.environ["DRAFT_DNA_CODE_DATA_SIG"] = sig
+    if previous is None or previous == sig:
+        return False
+    for name in [m for m in sys.modules if m == "theme" or m.startswith("draft_dna")]:
+        del sys.modules[name]
+    return True
+
+
+STALE = _code_and_data_changed()
+
 from draft_dna.config import get_settings  # noqa: E402
 from draft_dna.grading import classes as C  # noqa: E402
 from draft_dna.ingest.storage import read_table  # noqa: E402
@@ -39,6 +66,11 @@ theme.apply()
 S = get_settings()
 LOCAL_CARDS = S.paths.modeled / "cards"
 CARD_DIR = LOCAL_CARDS if LOCAL_CARDS.exists() else Path(tempfile.gettempdir()) / "draft_dna_cards"
+if STALE:  # new code or data deployed: forget cached tables and cards drawn by old code
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    if CARD_DIR != LOCAL_CARDS:
+        shutil.rmtree(CARD_DIR, ignore_errors=True)
 PAGES = {
     "home": "Home",
     "player": "Player card",
