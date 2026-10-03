@@ -17,7 +17,7 @@
 ## Findings
 1. **Draft position is the forecast to beat, and nothing beat it.** The best stats-based blend tied draft-slot history on the holdout (CRPS 0.331 vs 0.331). Stats-only comps were significantly worse. Calibrated draft-slot history is the model of record: 23.7% of players finished below the floor and 9.8% above the ceiling. ([Phase 3](#phase-3-comps-and-outcome-ranges-from-pre-draft-stats))
 2. **Shot data adds nothing detectable.** Adding shot type, assisted rate and shot mix changed forecast error by −0.0001 (95% CI −0.0016 to +0.0013). Shot location and NMF shot styles didn't help either. One exploratory lead, **rim finishing**, is pre-registered for confirmation on the 2023–2026 classes. ([Phase 5](#phase-5-does-how-a-prospect-scores-predict-nba-success))
-3. **Who beats their slot?** International and pro-team picks fall short (average PIT 0.40), and no franchise detectably develops players better than slot (p = 0.92). Size, passing and FT% predict early overperformance, but for college players that edge fades by year 6. ([Phase 6](#phase-6-who-beats-their-projection-and-why))
+3. **Who beats their slot?** International and pro-team picks fall short (average PIT 0.40), and no franchise detectably develops players better than slot (p = 0.85, crediting draft-night trades to the team that got the player). Size, passing and FT% predict early overperformance, but for college players that edge fades by year 6. ([Phase 6](#phase-6-who-beats-their-projection-and-why))
 4. **Year-4 verdicts hold up 86% of the time**, and when they're wrong they're usually too pessimistic (upgrades outnumber downgrades 3 to 1).
 5. **Teams already price in high-school recruiting rank.** Top-10 recruits go about 20 picks earlier than unranked players, then match their slot like everyone else (pre-registered test, ρ = +0.01, p = 0.82). The unranked-to-star list includes Curry, Lillard, Westbrook and Butler. ([Recruiting rank](#recruiting-rank-were-top-recruits-over--or-underrated))
 6. **Grades sharpen fast.** Bayesian updating puts about 54% of the weight on observed play after 2 seasons and 79% after 4. Forecast error falls from 0.43 on draft night to 0.03 by year 7. Grades count playoffs and accolades, so a Finals MVP isn't graded on regular-season box scores alone. ([Phase 7](#phase-7-grades-cards-and-the-app))
@@ -266,13 +266,13 @@ Each player's draft-night projection gives a range. A **PIT score** says where h
 
 ![Team effects](reports/phase6/team_effects.png)
 
-**No team detectably develops its picks better than their draft slot implies.** Franchise differences are no bigger than luck would produce (heterogeneity p = 0.92). Houston's and Indiana's apparent edges disappear under partial pooling.
+**No team detectably develops its picks better than their draft slot implies.** Franchise differences are no bigger than luck would produce (heterogeneity p = 0.85 at year 6). Picks traded on draft night are credited to the team that acquired them (Shai Gilgeous-Alexander to the Clippers, Luka Dončić to Dallas). Houston's and Indiana's apparent edges disappear under partial pooling.
 
 ![Situation effects](reports/phase6/situation_effects.png)
 
 **Situation effects** (propensity weighting adjusts for pick, age, size, stats and background; E-values say how much hidden bias would erase each one):
 - **Before the draft:** being drafted by a bad team or onto a crowded depth chart showed no detectable effect. Neither did a coaching change during the rookie deal.
-- **After the draft:** being traded early (−0.06) and missing a quarter of games in years 1–2 (−0.25) are strongly associated with falling short. Both are more plausibly *results* of underperforming than causes: struggling players get traded and benched. The E-value for trades is only 1.5.
+- **After the draft:** being traded in years 1–3 (−0.10) and missing a quarter of games in years 1–2 (−0.25) are strongly associated with falling short. Both are more plausibly *results* of underperforming than causes: struggling players get traded and benched. Draft-night trades don't count as "traded" here. The E-value for trades is 1.9.
 
 ![SHAP](reports/phase6/shap_overperformance.png)
 

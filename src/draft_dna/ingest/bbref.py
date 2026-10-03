@@ -243,6 +243,48 @@ def player_url(bbref_id: str) -> str:
 _CBB_LINK = re.compile(r"https?://www\.sports-reference\.com/cbb/players/([\w-]+)\.html")
 
 
+def parse_transactions(html: bytes, bbref_id: str) -> pd.DataFrame:
+    """Transactions block: date, kind (drafted / traded / other) and the team codes from
+    the links' data-attr-from / data-attr-to (first pair = this player's own move)."""
+    # The block often sits inside an HTML comment (rendered by JavaScript), so parse
+    # just that fragment from the raw text.
+    raw = html.decode("utf-8", "ignore")
+    start = raw.find('id="div_transactions"')
+    rows: list[dict[str, Any]] = []
+    if start < 0:
+        return pd.DataFrame(rows)
+    end = raw.find("</div>", start)
+    soup = BeautifulSoup("<div " + raw[start : end + 6], "lxml")
+    block = soup.find(id="div_transactions")
+    if not isinstance(block, Tag):
+        return pd.DataFrame(rows)
+    for p in block.find_all("p", class_="transaction"):
+        date = p.find("strong")
+        text = p.get_text(" ", strip=True)
+        frm = p.find(attrs={"data-attr-from": True})
+        to = p.find(attrs={"data-attr-to": True})
+        kind = (
+            "drafted"
+            if re.search(r"\bDrafted by\b", text)
+            else "traded"
+            if re.search(r"\btraded by\b", text, re.IGNORECASE)
+            else "other"
+        )
+        rows.append(
+            {
+                "bbref_id": bbref_id,
+                "date": pd.to_datetime(date.get_text(strip=True), errors="coerce")
+                if isinstance(date, Tag)
+                else pd.NaT,
+                "kind": kind,
+                "team_from": frm["data-attr-from"] if isinstance(frm, Tag) else None,
+                "team_to": to["data-attr-to"] if isinstance(to, Tag) else None,
+                "text": text[:300],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def parse_player_page(html: bytes, bbref_id: str) -> dict[str, Any]:
     """Bio fields from the #meta block plus the college-stats link."""
     soup = BeautifulSoup(html, "lxml")
@@ -286,8 +328,9 @@ def parse_player_page(html: bytes, bbref_id: str) -> dict[str, Any]:
 
 
 def ingest_player_pages(fetcher: Fetcher, bbref_ids: Iterable[str]) -> dict[str, pd.DataFrame]:
-    """Bio, college box stats (as listed on BBRef) and salary history per player."""
+    """Bio, college box stats (as listed on BBRef), salary history and transactions."""
     bios: list[dict[str, Any]] = []
+    transactions: list[pd.DataFrame] = []
     colleges: list[pd.DataFrame] = []
     salaries: list[pd.DataFrame] = []
     ids = sorted(set(bbref_ids))
@@ -300,6 +343,9 @@ def ingest_player_pages(fetcher: Fetcher, bbref_ids: Iterable[str]) -> dict[str,
             log.warning("no player page for %s", pid)
             continue
         bios.append(parse_player_page(html, pid))
+        tx = parse_transactions(html, pid)
+        if not tx.empty:
+            transactions.append(tx)
         for tid, sink in (("all_college_stats", colleges), ("all_salaries", salaries)):
             df = parse_table(html, tid)
             if not df.empty:
@@ -311,4 +357,7 @@ def ingest_player_pages(fetcher: Fetcher, bbref_ids: Iterable[str]) -> dict[str,
         if colleges
         else pd.DataFrame(),
         "player_salaries": pd.concat(salaries, ignore_index=True) if salaries else pd.DataFrame(),
+        "player_transactions": pd.concat(transactions, ignore_index=True)
+        if transactions
+        else pd.DataFrame(),
     }

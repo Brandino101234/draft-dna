@@ -78,7 +78,10 @@ def asof_bands(s: Settings) -> pd.DataFrame:
 def situations(s: Settings) -> pd.DataFrame:
     """Early-career context for each drafted player (Y = draft year, seasons Y+1..Y+3)."""
     players = read_table("modeled", "core", "players", s)
-    picks = players[players["drafted"]][["bbref_id", "draft_year", "team_id"]].copy()
+    # The team that actually got him: draft-night trades credit the acquiring team.
+    picks = players[players["drafted"]][["bbref_id", "draft_year", "rights_team"]].rename(
+        columns={"rights_team": "team_id"}
+    )
     picks["draft_year"] = picks["draft_year"].astype(int)
     feats = read_table("modeled", "features", "predraft", s).set_index("bbref_id")
     picks["position"] = picks["bbref_id"].map(feats["position"])

@@ -27,18 +27,18 @@
 
 |   horizon |   teams |      Q |   df |   p_value |   tau |   league_mean |
 |----------:|--------:|-------:|-----:|----------:|------:|--------------:|
-|         4 |      30 | 22.006 |   29 |     0.82  |     0 |         0.492 |
-|         6 |      30 | 19.096 |   29 |     0.919 |     0 |         0.504 |
-|         8 |      30 | 17.304 |   29 |     0.957 |     0 |         0.511 |
+|         4 |      30 | 26.915 |   29 |     0.576 |     0 |         0.492 |
+|         6 |      30 | 21.325 |   29 |     0.847 |     0 |         0.504 |
+|         8 |      30 | 24.202 |   29 |     0.719 |     0 |         0.511 |
 
 ## Situation effects (propensity-weighted, year 6)
 
 | situation                                                      | timing                   |    n |   treated_share |   raw_pit_diff |   ipw_pit_diff |   ipw_lo |   ipw_hi |   rr_above_median |   rr_lo |   rr_hi |   e_value |   e_value_ci |   max_abs_smd_before |   max_abs_smd_after |
 |:---------------------------------------------------------------|:-------------------------|-----:|----------------:|---------------:|---------------:|---------:|---------:|------------------:|--------:|--------:|----------:|-------------:|---------------------:|--------------------:|
-| Drafted by a bottom-third team (by SRS)                        | pre-draft                | 1077 |           0.397 |         -0.017 |         -0.008 |   -0.046 |    0.028 |             1.018 |   0.907 |   1.148 |     1.152 |        1     |                0.655 |               0.053 |
-| Drafting team deep at his position (top half of minutes share) | pre-draft                | 1077 |           0.458 |          0.019 |         -0.013 |   -0.051 |    0.022 |             0.942 |   0.826 |   1.068 |     1.316 |        1     |                0.424 |               0.158 |
-| Drafting team changed head coach in years 1-3                  | post-draft, team-level   | 1077 |           0.666 |          0.022 |          0.012 |   -0.031 |    0.045 |             1.043 |   0.915 |   1.175 |     1.253 |        1     |                0.195 |               0.011 |
-| Traded / moved teams in years 1-3                              | post-draft, player-level |  921 |           0.585 |         -0.051 |         -0.059 |   -0.098 |   -0.022 |             0.892 |   0.791 |   0.996 |     1.491 |        1.064 |                0.362 |               0.01  |
+| Drafted by a bottom-third team (by SRS)                        | pre-draft                | 1077 |           0.394 |         -0.005 |          0.009 |   -0.033 |    0.048 |             1.075 |   0.932 |   1.212 |     1.359 |        1     |                0.668 |               0.018 |
+| Drafting team deep at his position (top half of minutes share) | pre-draft                | 1077 |           0.463 |          0.026 |         -0.004 |   -0.039 |    0.032 |             0.97  |   0.873 |   1.093 |     1.211 |        1     |                0.382 |               0.16  |
+| Drafting team changed head coach in years 1-3                  | post-draft, team-level   | 1077 |           0.669 |         -0.012 |         -0.011 |   -0.046 |    0.023 |             0.967 |   0.855 |   1.087 |     1.222 |        1     |                0.168 |               0.024 |
+| Traded / moved teams in years 1-3                              | post-draft, player-level |  921 |           0.425 |         -0.086 |         -0.104 |   -0.144 |   -0.067 |             0.783 |   0.695 |   0.882 |     1.871 |        1.523 |                0.277 |               0.014 |
 | Missed >= 25% of games in years 1-2 (injury, G League or DNP)  | post-draft, player-level |  899 |           0.627 |         -0.182 |         -0.254 |   -0.287 |   -0.209 |             0.529 |   0.463 |   0.611 |     3.186 |        2.66  |                0.918 |               0.27  |
 
 ## Overperformance predictability

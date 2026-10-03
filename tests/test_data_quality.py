@@ -454,3 +454,13 @@ def test_every_draft_pick_is_graded_and_retrospective_only_before_as_of_history(
         retro["draft_year"].max()
         < g.loc[g["projection_type"] != "retrospective", "draft_year"].min()
     )
+
+
+def test_draft_night_trades_credit_the_acquiring_team(con) -> None:
+    p = q(con, "SELECT bbref_id, team_id, rights_team, drafted FROM modeled.core__players")
+    p = p.set_index("bbref_id")
+    assert p.loc["gilgesh01", "rights_team"] == "LAC"  # picked by Charlotte
+    assert p.loc["doncilu01", "rights_team"] == "DAL"  # picked by Atlanta
+    assert p.loc["jamesle01", "rights_team"] == "CLE"  # no draft-night trade
+    share = (p.loc[p["drafted"], "rights_team"] != p.loc[p["drafted"], "team_id"]).mean()
+    assert 0.15 < share < 0.40

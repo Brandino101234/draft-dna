@@ -339,3 +339,21 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Verdict under the pre-registered rule:** no detectable mis-valuation. Teams price recruiting rank into the pick (average pick: #16 for RSCI 1–10, #28 for 11–25, #31 for 26–100, #35 unranked), and after that recruits match their slot.
 - **Descriptive extremes:** unranked players who became stars include Curry, Lillard, Westbrook, Butler, Haliburton and George. The top-10 recruits furthest below slot include Josh Christopher, Greg Brown III, Brandon Boston Jr. and Josh Jackson.
 - **Limits:** RSCI only covers the top 100, so "unranked" mixes near-misses with true unknowns. Junior-college and late-blooming players are all unranked.
+
+### D036: Picks traded on draft night are credited to the team that got the player
+
+**Rule:** `players.rights_team` is the team holding a pick when his first season began.
+- **How it's built:** start from the drafting team (`team_id`) and follow trades in Basketball-Reference's transaction log (cached player pages, no new requests), from draft day through September 30. The 2020 draft was held in November, so its window is 30 days.
+- **Covers:** deals agreed on draft night but completed in July (Kobe: Hornets → Lakers, July 11, 1996).
+- **Guard:** a trade counts only if it moves the player away from the team currently holding him. This protects against misreading multi-team trade text, which starts "As part of a 3-team trade, traded by…" (lowercase).
+- **Scale:** 512 of 1,833 picks (28%) changed teams before their debut. Examples: Shai Gilgeous-Alexander CHO → LAC, Luka Dončić ATL → DAL, Dirk Nowitzki MIL → DAL, Kawhi Leonard IND → SAS, Jaden McDaniels LAL → OKC → MIN.
+
+**Used for:** grades (`team`, `franchise`; `drafted_by` keeps the original pick), the app's Teams page, card headers ("picked by CHO for LAC"), and all Phase 6 team and situation analyses (team quality, depth chart, coaching change, "traded in years 1–3").
+
+**Phase 6 re-run (D030 numbers superseded):**
+- **Team heterogeneity:** p = 0.58 / 0.85 / 0.72 at years 4 / 6 / 8 (was 0.82 / 0.92 / 0.96). Still no detectable team effect.
+- **Traded in years 1–3:** −0.104 (−0.144, −0.067), E-value 1.87 (was −0.059, E 1.49). Draft-night trades no longer count as early moves.
+- **Bottom-third team:** +0.009 (−0.033, +0.048).
+- **Deep at position:** −0.004 (−0.039, +0.032).
+- **Coaching change:** −0.011 (−0.046, +0.023).
+- **Conclusion:** none of the team-level effects is detectable.
