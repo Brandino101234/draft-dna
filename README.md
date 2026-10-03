@@ -343,7 +343,7 @@ NBA early-career shot maps are projected into the same six college shot styles. 
 - **Teams:** each franchise's picks against their slots (no detectable skill, per Phase 6, so read it as history)
 - **Recruits:** did teams misjudge high-school recruiting rank? (no), plus unranked stars and top-recruit misses
 - **Compare:** two players side by side
-- **Style map:** a 2D t-SNE layout of about 1,900 college and NBA shot styles
+- **Style map:** about 1,900 college and NBA shot diets, either on readable axes (share of shots at the rim vs from three) or as a t-SNE similarity map, where only closeness between dots matters and the axes have no units
 - **2026 tracker:** each rookie's season-value pace against his draft-night range
 - **About:** this writeup
 

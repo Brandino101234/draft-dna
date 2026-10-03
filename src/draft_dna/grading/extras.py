@@ -57,6 +57,30 @@ def nba_maps(s: Settings) -> pd.DataFrame:
     return shot_xy.player_maps(std[std["bbref_id"].isin(keep)])
 
 
+def nba_zone_shares(s: Settings) -> pd.DataFrame:
+    """Share of each NBA player's early-career shots by zone (same zones as college)."""
+    shots = read_table("raw", "nba_api", "shots_early_career", s)
+    std = shot_xy.standardize_nba(shots)
+    std = std[std["xy_valid"]]
+    counts = std.groupby("bbref_id").size()
+    std = std[std["bbref_id"].isin(counts.index[counts >= MIN_NBA_FGA])].copy()
+    std["zone"] = shot_xy.zone(std)
+    z = std.groupby("bbref_id")["zone"].value_counts(normalize=True).unstack(fill_value=0)
+    return z.add_prefix("zone_")
+
+
+def readable_axes(zones: pd.DataFrame) -> pd.DataFrame:
+    """Interpretable coordinates: share of shots at the rim and from three."""
+    z = zones.fillna(0)
+    return pd.DataFrame(
+        {
+            "rim_share": z.get("zone_rim", 0.0),
+            "three_share": z.get("zone_corner_three", 0.0) + z.get("zone_above_break_three", 0.0),
+        },
+        index=zones.index,
+    )
+
+
 def style_spaces(s: Settings) -> tuple[pd.DataFrame, pd.DataFrame, object]:
     """College and NBA style weights in one NMF space fit on college maps."""
     college = read_table("modeled", "features", "shot_maps", s).set_index("bbref_id")
@@ -138,5 +162,16 @@ def run(s: Settings) -> None:
     write_table(nba_maps(s).reset_index(names="bbref_id"), "modeled", "grading", "nba_maps", s)
     sm = style_map(college_w, nba_w, labels)
     sm["player_name"] = sm["bbref_id"].map(players["player_name"])
+    college_axes = readable_axes(
+        read_table("modeled", "features", "shot_zones", s).set_index("bbref_id")
+    )
+    nba_axes = readable_axes(nba_zone_shares(s))
+    is_college = sm["source"] == "college"
+    for col in ("rim_share", "three_share"):
+        sm[col] = np.where(
+            is_college,
+            sm["bbref_id"].map(college_axes[col]),
+            sm["bbref_id"].map(nba_axes[col]),
+        )
     write_table(sm, "modeled", "grading", "style_map", s)
     log.info("extras: %d plays-like rows, %d players on the style map", len(pl), len(sm))

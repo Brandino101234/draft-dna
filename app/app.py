@@ -553,49 +553,89 @@ elif page == "compare":
     b.image(card_path(pb), width="stretch")
 
 elif page == "styles":
-    st.subheader("Every player's shot style, in 2D")
-    st.caption(
-        "t-SNE layout of each player's mix of the six NMF shot styles (college maps and NBA "
-        "first-four-season maps). Nearby points shoot from similar places."
-    )
+    st.subheader("Every player's shot style")
     sm = data["style_map"].dropna(subset=["player_name"])
-    source = st.multiselect(
+    view = st.radio(
+        "Layout",
+        ["Rim vs three (readable axes)", "Style similarity map (t-SNE)"],
+        horizontal=True,
+    )
+    c1, c2 = st.columns([1, 2])
+    source = c1.multiselect(
         "Show", sorted(sm["source"].unique()), default=sorted(sm["source"].unique())
     )
     sm = sm[sm["source"].isin(source)]
-    highlight = st.multiselect(
+    highlight = c2.multiselect(
         "Highlight players",
         sorted(sm["player_name"].unique()),
         default=[
             n
-            for n in ["AJ Dybantsa", "Cooper Flagg", "Victor Wembanyama"]
+            for n in ["AJ Dybantsa", "Cooper Flagg", "Victor Wembanyama", "Stephen Curry"]
             if n in set(sm["player_name"])
         ],
     )
+    readable = view.startswith("Rim")
+    xcol, ycol = ("rim_share", "three_share") if readable else ("x", "y")
+    if readable:
+        sm = sm.dropna(subset=["rim_share", "three_share"])
+        st.caption(
+            "Each dot is one player's shot diet: **across** = share of shots at the rim "
+            "(within 4 ft), **up** = share of shots from three. College dots use pre-draft "
+            "shots; NBA dots use his first four seasons. Top-left = shooters, bottom-right = "
+            "rim attackers, bottom-left = midrange-heavy."
+        )
+    else:
+        st.caption(
+            "**The axes have no units.** t-SNE places players with a similar mix of the six "
+            "shot styles near each other, so only closeness matters: neighbors shoot from "
+            "similar places, while left/right, up/down and long distances mean nothing (a "
+            "rerun could rotate or flip the picture). Use the readable layout for "
+            "interpretable axes."
+        )
+    hover = {"x": False, "y": False, "rim_share": ":.0%", "three_share": ":.0%"}
     fig = px.scatter(
         sm,
-        x="x",
-        y="y",
+        x=xcol,
+        y=ycol,
         color="dominant_style",
         symbol="source",
         opacity=0.55,
         hover_name="player_name",
-        hover_data={"x": False, "y": False},
+        hover_data=hover,
+        labels={
+            "rim_share": "Share of shots at the rim",
+            "three_share": "Share of shots from three",
+            "dominant_style": "Dominant style",
+            "source": "Shots from",
+        },
         height=650,
     )
     fig.update_traces(marker={"size": 6})
     hi_pts = sm[sm["player_name"].isin(highlight)]
     fig.add_scatter(
-        x=hi_pts["x"],
-        y=hi_pts["y"],
+        x=hi_pts[xcol],
+        y=hi_pts[ycol],
         mode="markers+text",
-        text=hi_pts["player_name"],
+        text=hi_pts["player_name"]
+        + np.where(hi_pts["source"] == "college", " (college)", " (NBA)"),
         textposition="top center",
         name="highlighted",
         marker={"size": 13, "color": "white", "line": {"width": 2, "color": "black"}},
     )
-    fig.update_layout(xaxis_visible=False, yaxis_visible=False, legend_title_text="Dominant style")
+    if readable:
+        fig.update_layout(
+            xaxis={"tickformat": ".0%", "range": [0, 1]},
+            yaxis={"tickformat": ".0%", "range": [0, 0.9]},
+        )
+    else:
+        fig.update_layout(xaxis_visible=False, yaxis_visible=False)
+    fig.update_layout(legend_title_text="Dominant style")
     st.plotly_chart(fig, width="stretch")
+    if not readable:
+        st.caption(
+            "A player can appear twice: once for his college shots and once for his NBA "
+            "shots (e.g. Cooper Flagg)."
+        )
 
 elif page == "tracker":
     st.subheader("2026 class: projection vs reality")
