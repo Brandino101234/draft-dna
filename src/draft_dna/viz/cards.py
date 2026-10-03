@@ -29,7 +29,14 @@ from draft_dna.config import Settings
 from draft_dna.eval import metrics as M
 from draft_dna.features import shot_xy
 from draft_dna.ingest.storage import read_table
-from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
+from draft_dna.outcomes.tiers import (
+    ALL_TIERS,
+    HONOR_TIERS,
+    TIERS,
+    graded_peak,
+    tier_cuts,
+    tier_probabilities,
+)
 from draft_dna.viz.court import draw_folded_half_court
 
 # Dark "hero" card: near-black surface, Apple dark-mode accents, glowing shot maps.
@@ -170,7 +177,7 @@ def _range(ax: Axes, d: CardData, pid: str) -> None:
         ax.text(
             med,
             0.95,
-            f"actual {med:.1f} · {_tier_of(d, med)}",
+            f"actual {med:.1f} · {g.get('current_tier', _tier_of(d, med))}",
             fontsize=9,
             color=TEXT,
             ha="left" if med < 0.1 * top else "center",
@@ -201,10 +208,16 @@ def _tiers(ax: Axes, d: CardData, pid: str) -> None:
     g = d.grades.loc[pid]
     q = g[[f"post_{c}" for c in M.QCOLS]].to_numpy(dtype=float)[None, :]
     p = tier_probabilities(q, d.cuts)[0]
+    tier = g.get("current_tier")
+    if str(g["status"]).startswith("Career") and tier in ALL_TIERS:
+        # Finished career: the tier he actually reached (All-Star/All-NBA need selections;
+        # Superstar/MVP/Legend are honors above the All-NBA bar).
+        p = np.eye(len(TIERS))[min(ALL_TIERS.index(tier), len(TIERS) - 1)]
     y = np.arange(len(TIERS))[::-1]
     ax.barh(y, p, color=BLUE, height=0.6)
     for yi, v in zip(y, p, strict=True):
-        ax.text(v + 0.01, yi, f"{v:.0%}", va="center", fontsize=8.5, color=TEXT)
+        honor = f" · {tier}" if tier in HONOR_TIERS and v > 0.99 else ""
+        ax.text(v + 0.01, yi, f"{v:.0%}{honor}", va="center", fontsize=8.5, color=TEXT)
     ax.set_yticks(y, TIERS, fontsize=8.5, color=TEXT)
     ax.set_xlim(0, max(p.max() * 1.3, 0.3))
     ax.set_xticks([])
@@ -354,8 +367,8 @@ def _render(d: CardData, pid: str, path: Path) -> Path:
     limited = str(g.get("prospect_source")) in ("high_school", "other_team")
     if limited and len(comps):
         fig.text(
-            0.125,
-            0.555,
+            0.15,
+            0.1,
             "Comps: limited pre-draft data (age, size, position only)",
             fontsize=8.5,
             color=TEXT_2,

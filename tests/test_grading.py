@@ -180,3 +180,13 @@ def test_player_metrics_stash_filter_shrinkage_and_pick_value() -> None:
     )
     pv = C.pick_value(curve)
     assert pv["value"].iloc[0] == 100 and (np.diff(pv["value"]) <= 0).all()
+
+
+def test_honor_tiers_ladder() -> None:
+    from draft_dna.outcomes.tiers import honor_tier
+
+    assert honor_tier(all_nba=21, first_team=13, mvps=4) == "Legend"  # LeBron
+    assert honor_tier(all_nba=11, first_team=4, mvps=0) == "Legend"  # Chris Paul (10+ All-NBA)
+    assert honor_tier(all_nba=1, first_team=1, mvps=1) == "MVP"  # Derrick Rose
+    assert honor_tier(all_nba=6, first_team=6, mvps=0) == "Superstar"  # Luka
+    assert honor_tier(all_nba=5, first_team=1, mvps=0) is None  # stays All-NBA

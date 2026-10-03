@@ -27,7 +27,13 @@ from draft_dna.ingest.storage import read_table, write_table
 from draft_dna.logging_utils import get_logger
 from draft_dna.models import distribution as D
 from draft_dna.models import knn
-from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
+from draft_dna.outcomes.tiers import (
+    TIERS,
+    graded_peak,
+    honor_tier,
+    tier_cuts,
+    tier_probabilities,
+)
 
 log = get_logger(__name__)
 
@@ -171,6 +177,37 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
         out[f"{kind}_p_all_star"] = tp[:, star:].sum(axis=1)
         # Bust risk: chance the career never reaches rotation level (Out of league or Bust).
         out[f"{kind}_p_bust"] = tp[:, : TIERS.index("Rotation")].sum(axis=1)
+    # A finished career's tier is what he *was*: All-NBA tier requires an All-NBA selection
+    # and All-Star tier an All-Star selection; otherwise it tops out at Starter (D039).
+    # Projections stay forecasts. Grades (value vs slot) are unaffected.
+    otn = read_table("modeled", "outcomes", "outcomes_through_n", s)
+    acc = otn.sort_values("n").groupby("bbref_id")[["all_star_selections", "all_nba_selections"]]
+    acc = acc.last().reindex(out.index).fillna(0)
+    cap = np.where(
+        acc["all_nba_selections"] >= 1,
+        TIERS.index("All-NBA"),
+        np.where(acc["all_star_selections"] >= 1, TIERS.index("All-Star"), TIERS.index("Starter")),
+    )
+    value_tier = np.array([TIERS.index(t) for t in out["current_tier"]])
+    finished = final  # career over (8+ seasons or retired)
+    capped = np.where(finished, np.minimum(value_tier, cap), value_tier)
+    out["current_tier"] = [TIERS[i] for i in capped]
+    out.loc[finished, "current_p_all_star"] = (capped[finished] >= star).astype(float)
+    out.loc[finished, "current_p_bust"] = (capped[finished] < TIERS.index("Rotation")).astype(float)
+    # Honors earned so far lift anyone (finished or not) into Superstar / MVP / Legend.
+    seasons_tbl = read_table("modeled", "core", "nba_player_seasons", s)
+    hon = seasons_tbl.groupby("bbref_id").agg(
+        all_nba=("all_nba_team", lambda x: int(x.notna().sum())),
+        first_team=("all_nba_team", lambda x: int((x == "1st").sum())),
+        mvps=("won_mvp", "sum"),
+    )
+    hon = hon.reindex(out.index).fillna(0)
+    honors = [
+        honor_tier(a, f, m)
+        for a, f, m in zip(hon["all_nba"], hon["first_team"], hon["mvps"], strict=True)
+    ]
+    out["honor_tier"] = honors
+    out["current_tier"] = [h or t for h, t in zip(honors, out["current_tier"], strict=True)]
     out["confidence"] = 1 - np.clip(sd / s0, 0, 1)
     out["grade"] = B.grade_letter(out["current_median"].to_numpy(), grid)
     out.loc[out["seasons"] == 0, "grade"] = "-"  # no NBA games yet: projection only

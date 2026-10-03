@@ -125,7 +125,17 @@ Three definitions of season value were tested against things the metric never se
 | All-Star | 1.76–2.37 | All-Star selection |
 | All-NBA | ≥ 2.37 | All-NBA selection |
 
-Tiers describe how a player *played*, not how he was voted (67% exact agreement with the award and role anchors, 97% within one tier).
+Tiers describe how a player *played*, not how he was voted (67% exact agreement with the award and role anchors, 97% within one tier). Projections use these six value tiers.
+
+**Finished careers are labeled by what was actually earned** ([D039](DECISIONS.md)):
+- **All-Star and All-NBA tiers require the real selection.** Strong numbers alone top out at Starter. This moved 62 players, such as Jason Terry and Tayshaun Prince, who reached All-Star-level value without ever being selected.
+- **Three honor tiers sit above All-NBA**, for any player who has earned them:
+
+| Honor tier | Requires | Players |
+|---|---|---|
+| Superstar | 2+ All-NBA First Team selections | McGrady, Wade, Dwight Howard, Kawhi, Anthony Davis, Tatum, Luka |
+| MVP | an MVP award | Iverson, Rose, Westbrook, Harden, Embiid |
+| Legend | 2+ MVPs or 10+ All-NBA selections | Kobe, Nash, Duncan, Dirk, LeBron, Chris Paul, Durant, Curry, Giannis, Jokić, SGA |
 
 ![Tiers by pick](reports/phase2/tiers_by_pick.png)
 
