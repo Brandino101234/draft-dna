@@ -467,3 +467,20 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
   - Small samples at the top: 14 trades involved picks 1–5.
   - Value ignores fit, salary and championships.
   - Excluding complex deals may bias toward simple swaps.
+
+### D043: Team Draft IQ, judging each pick against who was still on the board
+
+**Per pick:** compare the chosen player with everyone drafted after him in the same draft.
+- **Clearly better** means a career peak more than 0.25 higher. Within 0.25, more championships wins, and equal rings is a tie.
+- **Championships:** the champion each season is the Finals MVP's team (cached page, D041). A ring = being on the champion's playoff roster.
+- **Ease weighting (user request: punish obvious misses more):** each better player counts exp(−k/15) when taken k picks later. A star taken right after counts about 1, ten picks later 0.5, forty later 0.07.
+- **Draft IQ** = typical weighted misses for that slot (classes 1996–2021, finished careers, smoothed over ±2 picks) − this pick's weighted misses.
+- **Rejected first try:** "share of later picks he beat" rated Kwame Brown at #1 above most picks, because most later picks never played.
+- **Missed star:** a pick that never reached All-Star while an All-NBA-or-better player went within the next 10 picks.
+
+**Per team:** Draft IQ averaged over picks, weighted by the slot's average value, so high picks count more. Credit goes to the team that got the player (D036). Uses finished careers from 1996–2021 drafts.
+- **Top:** LAL +0.78, NOP, SAS, HOU, BOS.
+- **Bottom:** LAC −0.85, SAC, DET, CHO.
+- **Worst picks:** Olowokandi (passed on Dirk), Bennett (Giannis), Wiseman (Haliburton), Thabeet (Curry).
+
+**Is it skill?** A permutation test (team labels shuffled within each draft, 2,000 times) finds the spread between teams is no larger than luck produces (p = 0.89). This agrees with Phase 6 (D030/D036). The page presents Draft IQ as a record of decisions, not evidence of reliably better drafting.

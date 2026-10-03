@@ -213,3 +213,11 @@ def test_parse_trades_splits_sides_and_resolves_future_picks() -> None:
     assert t[0]["received_unresolved"] == 1  # the 2030 pick hasn't become a player
     assert t[0]["team_from"] == "ATL" and t[0]["team_to"] == "DAL"
     assert t[1]["multi_team"]
+
+
+def test_draft_beats_uses_rings_only_for_close_calls() -> None:
+    from draft_dna.grading.drafting import beats
+
+    assert beats(2.0, 0, 1.0, 5) == 1.0  # clearly better career wins regardless of rings
+    assert beats(1.0, 0, 1.1, 2) == 0.0  # close call: more championships wins
+    assert beats(1.0, 1, 1.1, 1) == 0.5  # close call, same rings: tie

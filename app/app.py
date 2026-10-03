@@ -158,6 +158,8 @@ def load() -> dict[str, pd.DataFrame]:
         "metrics": read_table("modeled", "grading", "player_metrics", S),
         "rim_status": read_table("modeled", "rim_test", "status", S),
         "pick_trades": read_table("modeled", "grading", "pick_trades", S),
+        "drafting": read_table("modeled", "grading", "drafting", S),
+        "drafting_teams": read_table("modeled", "grading", "drafting_teams", S),
         "acc_models": read_table("modeled", "accuracy", "models", S),
         "acc_calibration": read_table("modeled", "accuracy", "calibration", S),
         "acc_allstar": read_table("modeled", "accuracy", "allstar_reliability", S),
@@ -1663,8 +1665,111 @@ elif page == "teams":
     theme.hero(
         "Teams",
         "Team draft report cards",
-        "How each franchise's picks did against their draft slots.",
+        "Who each franchise took, and who it left on the board.",
     )
+    dt = data["drafting_teams"]
+    dr = data["drafting"]
+    p_luck = float(dt["perm_p"].iloc[0])
+    st.markdown("### Draft IQ: who did they pass on?")
+    st.caption(
+        "Every pick is judged against the players still on the board. A better player taken "
+        "later counts against the pick, and counts more the sooner he went (a star taken "
+        "right after you was easy to find; a second-round gem nobody saw costs little). When "
+        "two careers are within 0.25, championships break the tie. Draft IQ = how much "
+        "better than typical for that draft slot, averaged over a team's picks (high picks "
+        "weigh more). Finished careers, 1996-2021 drafts; team = the team that got the player."
+    )
+    st.info(
+        f"Honest caveat: the differences between teams are no bigger than luck would "
+        f"produce (permutation test p = {p_luck:.2f}). This is a record of who left better "
+        "players on the board, not proof that any front office drafts reliably better.",
+        icon=":material/info:",
+    )
+    dtp = dt.sort_values("draft_iq")
+    fig = px.bar(
+        dtp,
+        x="draft_iq",
+        y="franchise",
+        orientation="h",
+        error_x=1.645 * dtp["se"],
+        height=760,
+        labels={
+            "draft_iq": "Draft IQ (90% interval; + = passed on fewer good players)",
+            "franchise": "",
+        },
+        hover_data={"picks": True, "missed_stars": True, "best_available": True},
+    )
+    fig.update_traces(
+        marker_color=[theme.BLUE if v >= 0 else theme.HERO_RED for v in dtp["draft_iq"]]
+    )
+    fig.add_vline(x=0, line_color=theme.MUTED, line_width=1)
+    st.plotly_chart(fig, width="stretch")
+    st.dataframe(
+        dt.drop(columns=["se", "perm_p"]),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "franchise": "Team",
+            "draft_iq": st.column_config.NumberColumn(
+                "Draft IQ",
+                format="%+.2f",
+                help="Average per pick of (typical misses for the slot - this pick's misses), "
+                "where each better player taken later counts by how soon he went.",
+            ),
+            "picks": "Picks",
+            "missed_stars": st.column_config.NumberColumn(
+                "Missed stars",
+                help="Picks that never reached All-Star while an All-NBA-or-"
+                "better player went within the next 10 picks.",
+            ),
+            "best_available": st.column_config.NumberColumn(
+                "Took the best available",
+                help="Picks where nobody drafted later had a clearly better career.",
+            ),
+        },
+    )
+    team_pick = st.selectbox("See a team's best picks and biggest misses", dt["franchise"].tolist())
+    fin_dr = dr[dr["status"].str.startswith("Career") & dr["draft_iq"].notna()]
+    tp = fin_dr[fin_dr["franchise"] == team_pick].copy()
+    tp["passed_on"] = (
+        tp["best_after"]
+        + " (#"
+        + tp["best_after_pick"].astype("Int64").astype(str)
+        + ", "
+        + tp["best_after_tier"]
+        + ")"
+    )
+    pcols = [
+        "bbref_id",
+        "draft_year",
+        "pick",
+        "player_name",
+        "current_tier",
+        "better_after",
+        "passed_on",
+        "draft_iq",
+    ]
+    pcfg = {
+        "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+        "current_tier": "Tier",
+        "better_after": st.column_config.NumberColumn(
+            "Better players taken later",
+            help="Players drafted after him with clearly better "
+            "careers (championships break close calls).",
+        ),
+        "passed_on": st.column_config.TextColumn("Best player taken later"),
+        "draft_iq": st.column_config.NumberColumn("Draft IQ", format="%+.1f"),
+    }
+    col_miss, col_hit = st.columns(2)
+    with col_miss:
+        st.markdown(f"**{team_pick}: biggest misses**")
+        clickable(tp.nsmallest(10, "draft_iq")[pcols], key=f"miss_{team_pick}", column_config=pcfg)
+    with col_hit:
+        st.markdown(f"**{team_pick}: best picks**")
+        best = tp.sort_values(["draft_iq", "current_median"], ascending=False).head(10)
+        clickable(best[pcols], key=f"hit_{team_pick}", column_config=pcfg)
+    st.markdown("---")
+    st.markdown("### Beat draft spot by: how their picks did against their slots")
     st.caption(
         "How each franchise's picks did against their draft slot. Phase 6 found these "
         "differences are no bigger than luck would produce (p = 0.85), so read this as a "

@@ -357,7 +357,7 @@ NBA early-career shot maps are projected into the same six college shot styles. 
 - **Redraft:** any class re-ordered by how careers turned out (2011: Kawhi, Butler, Kyrie, Isaiah Thomas from #60), with cross-class columns: *played like a typical #X pick* and *all-time rank*
 - **Draft classes:** which drafts were strongest. Each class's total value against an average class from the same picks, split into lottery vs later picks (2003, 2008 and 2009 lead; 2000 and 2016 trail)
 - **Steals & busts:** biggest moves between draft slot and redraft position, by year range and round
-- **Teams:** each franchise's picks against their slots (no detectable skill, per Phase 6, so read it as history)
+- **Teams:** Draft IQ, judging every pick against who was still on the board (stars taken right after you cost the most; championships break close calls), plus each team's biggest misses and best picks. Differences between teams are no bigger than luck (p = 0.89), so it's a history of decisions, not proof of skill
 - **Recruits:** did teams misjudge high-school recruiting rank? (no), plus unranked stars and top-recruit misses
 - **Pick trades:** was trading for a pick on draft night worth it? Value each side got after the trade: first-round buys are about a coin flip, second-round deals mostly a wash; best and worst deals ever (Dirk for Traylor)
 - **Leaderboards:** rookie-contract bargains (surplus in today's dollars), late bloomers, playoff risers, second contracts vs slot, durability, and draft-night bust risk
