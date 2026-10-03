@@ -31,7 +31,11 @@ from draft_dna.grading import classes as C  # noqa: E402
 from draft_dna.ingest.storage import read_table  # noqa: E402
 from draft_dna.viz import cards as card_viz  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "app"))
+import theme  # noqa: E402
+
 st.set_page_config(page_title="Draft DNA", page_icon="🏀", layout="wide")
+theme.apply()
 S = get_settings()
 LOCAL_CARDS = S.paths.modeled / "cards"
 CARD_DIR = LOCAL_CARDS if LOCAL_CARDS.exists() else Path(tempfile.gettempdir()) / "draft_dna_cards"
@@ -174,8 +178,7 @@ if target is not None:
 elif "nav" not in st.session_state:
     start = qp.get("page", "player")
     st.session_state["nav"] = PAGES.get(start, PAGES["player"])
-st.sidebar.title("Draft DNA")
-st.sidebar.caption("NBA draft comps, outcome ranges and grades from pre-draft data.")
+theme.brand()
 page_name = st.sidebar.radio("View", list(PAGES.values()), key="nav")
 page = slugs[list(PAGES.values()).index(page_name)]
 if page != "player" and qp.get("page") != page:  # keep the URL in step with the sidebar
@@ -185,7 +188,7 @@ if page != "player" and qp.get("page") != page:  # keep the URL in step with the
 
 def summary(pid: str) -> None:
     g = G.loc[pid]
-    c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.5, 1.5, 1])
+    c1, c2, c3, c4, c5 = st.columns([1.0, 1.7, 1.6, 1.6, 1.25])
     c1.metric("Grade", g["grade"], help=GRADE_HELP)
     c2.metric("Status", g["status"])
     tier_label = "Outcome tier" if g["finished"] else "Projected tier"
@@ -227,6 +230,11 @@ if page == "player":
         st.session_state["pc_player"] = names[0]
     choice = c_player.selectbox("Player (type to search)", names, key="pc_player")
     pid = options[choice]
+    gp = G.loc[pid]
+    theme.hero(
+        f"{int(gp['draft_year'])} draft · pick #{int(gp['pick'])} · {gp['team']}",
+        str(gp["player_name"]),
+    )
     if qp.get("player") != pid:
         qp.clear()
         qp["player"] = pid
@@ -311,7 +319,11 @@ if page == "player":
         )
 
 elif page == "redraft":
-    st.subheader("Redraft: every class re-ordered by how careers turned out")
+    theme.hero(
+        "Redraft",
+        "If teams could do it again",
+        "Every class re-ordered by how careers actually turned out.",
+    )
     years = sorted(grades["draft_year"].unique(), reverse=True)
     q_year = qp.get("year")
     default_year = int(q_year) if q_year and q_year.isdigit() and int(q_year) in years else 2011
@@ -332,13 +344,16 @@ elif page == "redraft":
         y="redraft",
         color="grade",
         hover_name="player_name",
-        color_discrete_map={"A": "#1baf7a", "B": "#2a78d6", "C": "#eda100", "D": "#e34948"},
+        color_discrete_map=theme.GRADE_COLORS,
         category_orders={"grade": ["A", "B", "C", "D", "-"]},
         labels={"pick": "Actual pick", "redraft": "Redraft position"},
         height=420,
     )
     top = len(cls)
-    fig.add_shape(type="line", x0=1, y0=1, x1=top, y1=top, line={"dash": "dot", "color": "#999"})
+    fig.add_shape(
+        type="line", x0=1, y0=1, x1=top, y1=top, line={"dash": "dot", "color": theme.MUTED}
+    )
+    fig.update_traces(marker={"size": 9, "line": {"width": 1, "color": theme.BG}})
     fig.update_yaxes(autorange="reversed")
     st.plotly_chart(fig, width="stretch")
     st.caption("Above the dotted line = drafted too late; below = drafted too early.")
@@ -377,7 +392,11 @@ elif page == "redraft":
     )
 
 elif page == "classes":
-    st.subheader("Draft classes: which drafts were strongest?")
+    theme.hero(
+        "Draft classes",
+        "Which drafts were strongest?",
+        "Every class against an average draft from the same 60 picks.",
+    )
     st.caption(
         "Strength = total career peak a class produced minus what an average class produces "
         "from the same 60 picks (0 = an average draft; positive = stronger). Unfinished "
@@ -392,12 +411,13 @@ elif page == "classes":
         x="draft_year",
         y="strength",
         color="status",
-        color_discrete_map={"complete": "#2a78d6", "provisional": "#a9c8ee"},
+        color_discrete_map={"complete": theme.BLUE, "provisional": "rgba(10,132,255,0.35)"},
         hover_data={"best_player": True, "stars": True, "starters_plus": True},
         labels={"draft_year": "Draft class", "strength": "Value vs an average class"},
         height=420,
     )
-    fig.add_hline(y=0, line_color="#52514e", line_width=1)
+    fig.add_hline(y=0, line_color=theme.MUTED, line_width=1)
+    fig.update_layout(legend={"orientation": "h", "y": 1.08, "x": 0, "title": ""})
     st.plotly_chart(fig, width="stretch")
     table = CLASSES.sort_values("rank")[
         [
@@ -437,7 +457,11 @@ elif page == "classes":
     st.caption("Click a class to open its redraft.")
 
 elif page == "steals":
-    st.subheader("Steals and busts: who should have gone much higher, or much lower")
+    theme.hero(
+        "Steals & busts",
+        "Who should have gone higher, or lower",
+        "The biggest gaps between draft slot and redraft position.",
+    )
     st.caption(
         "Ranked by redraft spots moved: drafted pick minus where he'd go if each class were "
         "redrafted by career peak. Value vs slot = career peak minus the draft-night median "
@@ -485,7 +509,11 @@ elif page == "steals":
     st.caption("Click a row to open that player's card.")
 
 elif page == "teams":
-    st.subheader("Team draft report cards")
+    theme.hero(
+        "Teams",
+        "Team draft report cards",
+        "How each franchise's picks did against their draft slots.",
+    )
     st.caption(
         "How each franchise's picks did against their draft slot. Phase 6 found these "
         "differences are no bigger than luck would produce (p = 0.85), so read this as a "
@@ -533,7 +561,7 @@ elif page == "teams":
             "franchise": "",
         },
     )
-    fig.update_traces(marker_color="#2a78d6")
+    fig.update_traces(marker_color=theme.BLUE)
     fig.update_yaxes(autorange="reversed")
     st.plotly_chart(fig, width="stretch")
     st.dataframe(
@@ -554,7 +582,11 @@ elif page == "teams":
     )
 
 elif page == "recruits":
-    st.subheader("Did teams misjudge high-school recruiting rankings?")
+    theme.hero(
+        "Recruits",
+        "Did teams misjudge high-school rankings?",
+        "Top recruits vs their draft slot, 2005-2021.",
+    )
     tests = data["recruit_tests"].set_index(["horizon", "scope"])
     t4 = tests.loc[(4, "all picks")]
     st.markdown(
@@ -648,7 +680,11 @@ elif page == "compare":
     b.image(card_path(pb), width="stretch")
 
 elif page == "styles":
-    st.subheader("Every player's shot style")
+    theme.hero(
+        "Style map",
+        "Where every player shoots from",
+        "About 1,900 college and NBA shot diets on one map.",
+    )
     sm = data["style_map"].dropna(subset=["player_name"])
     view = st.radio(
         "Layout",
@@ -705,7 +741,7 @@ elif page == "styles":
         },
         height=650,
     )
-    fig.update_traces(marker={"size": 6})
+    fig.update_traces(marker={"size": 8})
     hi_pts = sm[sm["player_name"].isin(highlight)]
     fig.add_scatter(
         x=hi_pts[xcol],
@@ -715,7 +751,7 @@ elif page == "styles":
         + np.where(hi_pts["source"] == "college", " (college)", " (NBA)"),
         textposition="top center",
         name="highlighted",
-        marker={"size": 13, "color": "white", "line": {"width": 2, "color": "black"}},
+        marker={"size": 13, "color": theme.TEXT, "line": {"width": 3, "color": theme.HERO_GOLD}},
     )
     if readable:
         fig.update_layout(
@@ -733,7 +769,11 @@ elif page == "styles":
         )
 
 elif page == "tracker":
-    st.subheader("2026 class: projection vs reality")
+    theme.hero(
+        "2026 tracker",
+        "The rookies, live",
+        "Draft-night projection vs what they're actually doing this season.",
+    )
     t = data["tracker"]
     played = int((t["games"] > 0).sum())
     if played == 0:
@@ -761,13 +801,13 @@ elif page == "tracker":
             x1=r["projected_ceiling"],
             y0=r["player_name"],
             y1=r["player_name"],
-            line={"width": 6, "color": "rgba(42,120,214,0.3)"},
+            line={"width": 6, "color": "rgba(10,132,255,0.35)"},
         )
     fig.add_scatter(
         x=top["projected_median"],
         y=top["player_name"],
         mode="markers",
-        marker={"symbol": "line-ns", "size": 14, "color": "#2a78d6", "line": {"width": 2}},
+        marker={"symbol": "line-ns", "size": 14, "color": theme.BLUE, "line": {"width": 2}},
         name="projected median",
     )
     st.plotly_chart(fig, width="stretch")
