@@ -195,7 +195,9 @@ def ingest_finals_mvp(fetcher: Fetcher) -> pd.DataFrame:
     df = parse_table(html, "finals_mvp_NBA")
     df = df[df["player__id"].notna()].copy()
     df["season"] = df["season"].str[:4].astype(int) + 1  # "2025-26" -> 2026
-    return df[["season", "player__id"]].rename(columns={"player__id": "bbref_id"})
+    out = df[["season", "player__id", "team_id"]]
+    # The Finals MVP's team is that season's champion.
+    return out.rename(columns={"player__id": "bbref_id", "team_id": "champion"})
 
 
 def ingest_all_stars(fetcher: Fetcher, seasons: Iterable[int]) -> pd.DataFrame:

@@ -118,7 +118,10 @@ def grade() -> None:
     rim_confirmation.run(s)
     from draft_dna.grading import pick_trades
 
-    pick_trades.run(s)  # writes status; runs the D029 test once a class is ready
+    pick_trades.run(s)
+    from draft_dna.grading import drafting
+
+    drafting.run(s)  # writes status; runs the D029 test once a class is ready
     db.load(s)
 
 
