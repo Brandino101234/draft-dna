@@ -122,6 +122,25 @@ GRADE_HELP = (
     "the median, C beat the floor (25th pct), D below the floor."
 )
 LIMITED_SOURCES = ("high_school", "other_team")
+BEAT_LABEL = "Beat draft spot by"
+BEAT_HELP = (
+    "His career peak (best 3-season stretch, playoffs included) minus what is typical for "
+    "the spot he was drafted at (the draft-night median for that pick). Positive = he beat "
+    "his draft spot, negative = fell short. Scale: about 0.3 is a typical NBA player, 1.0 a "
+    "starter, 1.8 All-Star level, 2.4+ All-NBA level. Example: Jimmy Butler (#30) +3.8, "
+    "Anthony Bennett (#1) -2.0."
+)
+BEAT_GROUP_HELP = (
+    "Average 'beat draft spot by' across this group's picks, shown relative to the average "
+    "pick (0 = typical). A few superstars lift every average, so raw averages all sit above "
+    "zero; centering makes groups comparable. Positive = this group's picks beat their "
+    "draft spots more than usual."
+)
+SECOND_HELP = (
+    "His best salary in years 5-7 (the second contract) as a share of the salary cap, minus "
+    "the average for players drafted at the same spot. +10 pts = paid 10% of the cap more "
+    "than is typical for his draft spot."
+)
 
 
 @st.cache_data(show_spinner=False)
@@ -201,15 +220,39 @@ HEADERS = {
     "comp_draft_year": st.column_config.NumberColumn("Year", format="%d"),
     "comp_pick": "Pick",
     "pick": "Pick",
-    "grade": "Grade",
+    "grade": st.column_config.TextColumn("Grade", help=GRADE_HELP),
     "status": "Status",
     "rank": "#",
+    "value_vs_slot": st.column_config.NumberColumn(BEAT_LABEL, format="%+.2f", help=BEAT_HELP),
+    "played_like": st.column_config.TextColumn(
+        "Played like",
+        help="The earliest draft spot whose typical career he matched, using every draft "
+        "since 1996. Comparable across draft classes. '#1 or better' = at least a typical "
+        "#1 pick's career.",
+    ),
+    "all_time_rank": st.column_config.NumberColumn(
+        "All-time rank",
+        format="%d",
+        help="Rank of his career peak among all 1,833 picks since 1996 (1 = best).",
+    ),
+    "current_tier": st.column_config.TextColumn(
+        "Tier",
+        help="Finished careers: the level he actually reached. All-Star and All-NBA require "
+        "the real selection; Superstar = 2+ All-NBA First Teams, MVP = won MVP, Legend = 2+ "
+        "MVPs, 2+ Finals MVPs or 10+ All-NBA. Careers in progress: the projected tier.",
+    ),
 }
 
 
 def clickable(df: pd.DataFrame, key: str, **kwargs: object) -> None:
     """A table whose rows open that player's card (expects a bbref_id column)."""
-    kwargs["column_config"] = {**HEADERS, **kwargs.get("column_config", {})}  # type: ignore[dict-item]
+    # Plain-string labels passed per table don't replace a shared column that carries help.
+    own = {
+        k: v
+        for k, v in kwargs.get("column_config", {}).items()  # type: ignore[attr-defined]
+        if not (isinstance(v, str) and k in HEADERS and not isinstance(HEADERS[k], str))
+    }
+    kwargs["column_config"] = {**HEADERS, **own}
     event = st.dataframe(
         df.drop(columns="bbref_id"),
         hide_index=True,
@@ -342,7 +385,7 @@ def more_metrics(g: pd.Series) -> None:
             _fmt_or(g["second_pct"], ".0%"),
             delta=None
             if pd.isna(g["second_vs_slot"])
-            else f"{g['second_vs_slot'] * 100:+.0f} pts vs slot",
+            else f"{g['second_vs_slot'] * 100:+.0f} pts vs draft spot",
             help="Best salary as a share of the cap in years 5-7 (the second contract), vs the "
             "average for his draft slot.",
         )
@@ -945,7 +988,9 @@ elif page == "leaders":
         "late_bloomer": st.column_config.NumberColumn("Late bloomer", format="%+.1f"),
         "playoff_riser": st.column_config.NumberColumn("Playoff riser", format="%+.1f"),
         "second_pct": st.column_config.NumberColumn("2nd contract (% cap)", format="percent"),
-        "second_vs_slot": st.column_config.NumberColumn("vs slot", format="percent"),
+        "second_vs_slot": st.column_config.NumberColumn(
+            "2nd contract vs draft spot", format="percent", help=SECOND_HELP
+        ),
         "rotation_seasons": "Rotation seasons",
         "availability": st.column_config.NumberColumn("Games played", format="percent"),
         "projected_p_bust": st.column_config.NumberColumn("Bust risk", format="percent"),
@@ -1065,9 +1110,9 @@ elif page == "rankings":
     )
     sort_opts = {
         "Career peak (all-time rank)": "current_median",
-        "Value vs draft slot": "value_vs_slot",
+        "Beat draft spot by": "value_vs_slot",
         "Rookie-deal surplus": "surplus_m",
-        "Second contract vs slot": "second_vs_slot",
+        "Second contract vs draft spot": "second_vs_slot",
         "Late bloomer index": "late_bloomer",
         "Playoff riser": "playoff_riser",
         "Rotation seasons": "rotation_seasons",
@@ -1132,10 +1177,12 @@ elif page == "rankings":
             "played_like": "Played like",
             "all_time_rank": st.column_config.NumberColumn("All-time", format="%d"),
             "current_median": st.column_config.NumberColumn("Peak value", format="%.2f"),
-            "value_vs_slot": st.column_config.NumberColumn("vs slot", format="%+.2f"),
+            "value_vs_slot": st.column_config.NumberColumn(
+                BEAT_LABEL, format="%+.2f", help=BEAT_HELP
+            ),
             "surplus_m": st.column_config.NumberColumn("Surplus $M", format="%+.0f"),
             "second_vs_slot": st.column_config.NumberColumn(
-                "2nd contract vs slot", format="percent"
+                "2nd contract vs draft spot", format="percent", help=SECOND_HELP
             ),
             "late_bloomer": st.column_config.NumberColumn("Late bloomer", format="%+.1f"),
             "playoff_riser": st.column_config.NumberColumn("Playoff riser", format="%+.1f"),
@@ -1158,7 +1205,7 @@ elif page == "colleges":
         "Every program's NBA picks against what their draft slots usually produce.",
     )
     st.caption(
-        "Value vs slot = career peak minus the draft-night median for the slot, averaged over "
+        "Beat draft spot by = career peak minus what is typical for the pick, averaged over "
         "a school's picks and shown relative to the average college pick (0 = typical). The "
         "bars are 90% intervals: with 10-60 picks per school, much of the spread is luck."
     )
@@ -1200,7 +1247,7 @@ elif page == "colleges":
         error_x=1.645 * show.iloc[::-1]["se"],
         height=560,
         labels={
-            "vs_slot": "Average value vs slot, relative to the typical college pick",
+            "vs_slot": "Beat draft spot by (average, relative to the typical college pick)",
             "college": "",
         },
         hover_data={"picks": True, "best_player": True},
@@ -1219,7 +1266,9 @@ elif page == "colleges":
             "college": "School",
             "picks": "Picks",
             "avg_pick": st.column_config.NumberColumn("Avg pick", format="%.0f"),
-            "vs_slot": st.column_config.NumberColumn("Value vs slot", format="%+.2f"),
+            "vs_slot": st.column_config.NumberColumn(
+                "Beat draft spot by (avg)", format="%+.2f", help=BEAT_GROUP_HELP
+            ),
             "beat_slot": st.column_config.ProgressColumn(
                 "Beat slot median", format="percent", min_value=0, max_value=1
             ),
@@ -1248,7 +1297,9 @@ elif page == "colleges":
                 "draft_year": st.column_config.NumberColumn("Year", format="%d"),
                 "current_tier": "Tier",
                 "played_like": "Played like",
-                "value_vs_slot": st.column_config.NumberColumn("vs slot", format="%+.2f"),
+                "value_vs_slot": st.column_config.NumberColumn(
+                    BEAT_LABEL, format="%+.2f", help=BEAT_HELP
+                ),
             },
         )
 
@@ -1284,13 +1335,12 @@ elif page == "international":
         help="Of those who did play: debuted in season 2 or later after the draft.",
     )
     c4.metric(
-        "Value vs slot",
+        "Beat draft spot by (avg)",
         f"{done['value_vs_slot'].mean() - allp['value_vs_slot'].mean():+.2f}",
         delta="vs all picks",
         delta_color="off",
         delta_arrow="off",
-        help="Average career peak minus the draft-night median for the slot, relative "
-        "to all picks (Phase 6: international picks fall short of their slot).",
+        help=BEAT_GROUP_HELP + " International picks fall slightly short (Phase 6).",
     )
     by_year = (
         intl.groupby("draft_year")
@@ -1340,7 +1390,9 @@ elif page == "international":
                 "Played in NBA", format="percent", min_value=0, max_value=1
             ),
             "stashed": st.column_config.NumberColumn("Arrived late", format="percent"),
-            "vs_slot": st.column_config.NumberColumn("Value vs slot", format="%+.2f"),
+            "vs_slot": st.column_config.NumberColumn(
+                "Beat draft spot by (avg)", format="%+.2f", help=BEAT_GROUP_HELP
+            ),
             "stars": "All-Stars+",
             "best_player": "Best player",
         },
@@ -1439,8 +1491,8 @@ elif page == "steals":
     )
     st.caption(
         "Ranked by redraft spots moved: drafted pick minus where he'd go if each class were "
-        "redrafted by career peak. Value vs slot = career peak minus the draft-night median "
-        "for his slot."
+        "redrafted by career peak. Beat draft spot by = career peak minus what is typical for "
+        "the pick (hover the column for details)."
     )
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
@@ -1470,7 +1522,7 @@ elif page == "steals":
         "moved": st.column_config.NumberColumn("Moved", format="%+d"),
         "projected_median": st.column_config.NumberColumn("Expected", format="%.2f"),
         "current_median": st.column_config.NumberColumn("Actual", format="%.2f"),
-        "value_vs_slot": st.column_config.NumberColumn("Value vs slot", format="%+.2f"),
+        "value_vs_slot": st.column_config.NumberColumn(BEAT_LABEL, format="%+.2f", help=BEAT_HELP),
     }
     left, right = st.columns(2)
     with left:
@@ -1532,7 +1584,8 @@ elif page == "teams":
         error_x=1.645 * agg["se"],
         height=750,
         labels={
-            "value_vs_slot": "Average value vs slot, relative to league average (90% interval)",
+            "value_vs_slot": "Beat draft spot by (average, relative to the typical pick; 90% "
+            "interval)",
             "franchise": "",
         },
     )
@@ -1545,14 +1598,18 @@ elif page == "teams":
         width="stretch",
         column_config={
             "value_vs_slot": st.column_config.NumberColumn(
-                "Avg value vs slot (vs league)", format="%+.2f"
+                "Beat draft spot by (avg)", format="%+.2f", help=BEAT_GROUP_HELP
             ),
             "beat_median": st.column_config.ProgressColumn(
                 "Beat slot median (A/B)", format="percent", min_value=0, max_value=1
             ),
             "a_grades": "A grades",
-            "best_pick": "Best pick vs slot",
-            "worst_pick": "Worst pick vs slot",
+            "best_pick": st.column_config.TextColumn(
+                "Best pick vs draft spot", help="The pick who beat his draft spot by the most."
+            ),
+            "worst_pick": st.column_config.TextColumn(
+                "Worst pick vs draft spot", help="The pick who fell furthest short of his spot."
+            ),
         },
     )
 
