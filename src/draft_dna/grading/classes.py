@@ -116,3 +116,10 @@ def class_strength(grades: pd.DataFrame, curve: pd.DataFrame) -> pd.DataFrame:
     out["provisional"] = out["finished_share"] < 0.9
     out["rank"] = out["strength"].rank(ascending=False, method="min").astype(int)
     return out.reset_index()
+
+
+def pick_value(curve: pd.DataFrame) -> pd.DataFrame:
+    """Draft pick value chart: each slot's average career peak, with the #1 pick = 100."""
+    v = curve[["pick", "average_peak"]].copy()
+    v["value"] = 100 * v["average_peak"] / v["average_peak"].iloc[0]
+    return v

@@ -21,11 +21,12 @@ import pandas as pd
 from draft_dna.config import Settings
 from draft_dna.eval import backtest as bt
 from draft_dna.eval import metrics as M
-from draft_dna.eval.phase3 import pick_conformal
 from draft_dna.eval.phase6 import FRANCHISE
 from draft_dna.grading import bayes as B
 from draft_dna.ingest.storage import read_table, write_table
 from draft_dna.logging_utils import get_logger
+from draft_dna.models import distribution as D
+from draft_dna.models import knn
 from draft_dna.outcomes.tiers import TIERS, graded_peak, tier_cuts, tier_probabilities
 
 log = get_logger(__name__)
@@ -38,6 +39,15 @@ def peaks_wide(s: Settings) -> pd.DataFrame:
     otn = read_table("modeled", "outcomes", "outcomes_through_n", s)
     otn["peak"] = graded_peak(otn, tier_cuts(s))
     return otn.pivot(index="bbref_id", columns="n", values="peak")
+
+
+def prior_model(n_train: int) -> D.Conformal:
+    """Model of record (draft-slot neighbors + conformal), with the neighbor count capped
+    at ~20% of the training players. The tuned k = 60 assumed 300+ players; the earliest
+    graded classes (2005-2007) have 115-230, and k = 60 there averaged a #1 pick with
+    picks down to ~#30, giving every top-5 pick in 2005 the same projection (D038)."""
+    k = min(knn.PickBaseline.k, max(10, round(0.2 * n_train)))
+    return D.Conformal(lambda: knn.PickBaseline(k=k))
 
 
 def asof_prior_grids(
@@ -61,7 +71,7 @@ def asof_prior_grids(
             train = known[known["draft_year"] != year]
         cls = df[df["draft_year"] == year]
         q = M.monotone(
-            pick_conformal().fit(train, train["y_final"].to_numpy()).predict_quantiles(cls)
+            prior_model(len(train)).fit(train, train["y_final"].to_numpy()).predict_quantiles(cls)
         )
         rows.append(
             pd.DataFrame(q, columns=QCOLS).assign(
@@ -157,7 +167,10 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
     for kind, q in (("projected", grid), ("current", pq)):
         med = q[:, M.qidx(M.MEDIAN)]
         out[f"{kind}_tier"] = [TIERS[i] for i in np.searchsorted(cuts, med, side="right")]
-        out[f"{kind}_p_all_star"] = tier_probabilities(q, cuts)[:, star:].sum(axis=1)
+        tp = tier_probabilities(q, cuts)
+        out[f"{kind}_p_all_star"] = tp[:, star:].sum(axis=1)
+        # Bust risk: chance the career never reaches rotation level (Out of league or Bust).
+        out[f"{kind}_p_bust"] = tp[:, : TIERS.index("Rotation")].sum(axis=1)
     out["confidence"] = 1 - np.clip(sd / s0, 0, 1)
     out["grade"] = B.grade_letter(out["current_median"].to_numpy(), grid)
     out.loc[out["seasons"] == 0, "grade"] = "-"  # no NBA games yet: projection only

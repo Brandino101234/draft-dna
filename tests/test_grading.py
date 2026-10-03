@@ -148,3 +148,35 @@ def test_class_metrics_curve_is_monotone_and_average_class_scores_zero() -> None
     assert abs(strength["strength"].mean()) < 1.0  # average class ~ 0
     eq = C.equivalent_pick(pd.Series([10.0, curve["typical_peak"].iloc[9], 0.0]), curve)
     assert eq.iloc[0] == 1 and eq.iloc[1] <= 10 and np.isnan(eq.iloc[2])
+
+
+def test_player_metrics_stash_filter_shrinkage_and_pick_value() -> None:
+    import numpy as np
+    import pandas as pd
+
+    from draft_dna.grading import classes as C
+    from draft_dna.grading import player_metrics as PM
+
+    # Late bloomer: a stash player (0 early NBA seasons) is excluded.
+    peaks = pd.DataFrame({3: [0.5, 1.0, 1.5, 0.0], 8: [0.6, 1.2, 1.6, 2.0]}, index=list("abcs"))
+    early = pd.Series({"a": 3, "b": 3, "c": 2, "s": 0})
+    lb = PM.late_bloomer(peaks, early)
+    assert "s" not in lb.index and len(lb) == 3
+
+    # Playoff riser: same gap, more playoff minutes -> larger (less shrunk) score.
+    d = pd.DataFrame(
+        {
+            "bbref_id": ["x", "y"],
+            "po_mp": [400.0, 2000.0],
+            "po_bpm": [3.0, 3.0],
+            "bpm": [1.0, 1.0],
+        }
+    )
+    r = PM.playoff_riser(d)
+    assert 0 < r["x"] < r["y"] < 2.0
+
+    curve = pd.DataFrame(
+        {"pick": np.arange(1, 61), "average_peak": np.linspace(3, 0.1, 60), "typical_peak": 0}
+    )
+    pv = C.pick_value(curve)
+    assert pv["value"].iloc[0] == 100 and (np.diff(pv["value"]) <= 0).all()

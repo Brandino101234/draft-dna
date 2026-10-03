@@ -375,3 +375,22 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Split:** lottery (1–14) vs later (15–60) contributions.
 - **Ranking:** 2003 (+11.4), 2008 (+9.3, almost all from picks 15–60), 2009 (+9.3), 2018 (+9.1), 1999 (+8.9) top; 2000 (−14.3), 2016 (−11.9, busts at #4/#5/#8/#10/#13) and 2006 (−10.2) bottom.
 - **Provisional:** classes under 90% finished are flagged and move each season.
+
+### D038: Extra player metrics, pick value chart, style-match percentiles, thin-history fix
+
+**Metrics** (descriptive only; none feed the projections; `grading/player_metrics.py`):
+- **Rookie-contract surplus.** Each of seasons 1–4 is priced at veteran market rates: share of cap ≈ a + b × season value, fit on seasons 5+. Subtract the actual share of cap, sum, and express in 2026–27 dollars. Missing salaries (mostly two-way and 10-day players; coverage is 83–100% by season) are filled with that season's 5th-percentile salary. Top: Chris Paul +$168M, LeBron, Pierce, Towns, Wade. Caveat: it uses same-season production as the market price, so it measures value delivered, not what a team could have predicted.
+- **Late bloomer index.** Standardized residual of √peak₈ on √peak₃, only for players in the NBA for 2+ of their first 3 seasons. Without that filter, draft-and-stash players (Ginóbili, Scola, Splitter) topped the list just for arriving late. Top: Whiteside, Billups, J. O'Neal, Gerald Wallace, SGA, Curry. Bottom (early peakers): Andre Miller, Yao, Carter, Carmelo.
+- **Playoff riser.** Playoff minus regular-season BPM in the same seasons, weighted by playoff minutes, shrunk by M / (M + 1000), with 300+ playoff minutes required.
+- **Second contract.** Max share of cap in seasons 5–7, minus the smoothed slot average (classes with 7 seasons observed).
+- **Durability.** Seasons with 1,000+ minutes, and games played / team games in seasons played.
+- **Bust risk.** P(Out of league or Bust tier) from the draft-night grid (and current).
+
+**Pick value chart:** the smoothed average-peak curve (D037) scaled so #1 = 100: #5 54, #10 41, #20 26, #30 20, #45 10. The trade calculator sums slots.
+
+**Style-match percentages:** plays-like cosine similarity is shown as a percent, with a rarity percentile (share of all NBA player pairs less alike). Raw similarities run high: a random pair has median 0.82, and the 90th percentile is 0.96. So "98% · top 4%" is the honest reading.
+
+**Thin-history fix in grading priors:** the as-of draft-night model uses k = min(60, max(10, 0.2 × n_train)) neighbors.
+- **Why:** with 115 training players (the 2005 class learns only from 1996–97), k = 60 averaged a #1 pick with picks down to ~#30, and all of 2005's top 5 got identical projections (median 0.75, bust risk 38%).
+- **Effect:** 2005 top-5 bust risk is now 12% (in line with other years) and medians differ by slot.
+- **Validation:** unchanged (fit ≤ 2010 has large n). The as-of finished-career mix is A 9.1 / B 36.4 / C 30.3 / D 24.1%.

@@ -46,6 +46,8 @@ PAGES = {
     "classes": "Draft classes",
     "steals": "Steals & busts",
     "teams": "Teams",
+    "leaders": "Leaderboards",
+    "pickvalue": "Pick value",
     "recruits": "Recruits",
     "compare": "Compare",
     "styles": "Style map",
@@ -72,6 +74,7 @@ def load() -> dict[str, pd.DataFrame]:
         "recruits": read_table("modeled", "recruits", "players", S),
         "recruit_summary": read_table("modeled", "recruits", "summary", S),
         "recruit_tests": read_table("modeled", "recruits", "tests", S),
+        "metrics": read_table("modeled", "grading", "player_metrics", S),
         "acc_models": read_table("modeled", "accuracy", "models", S),
         "acc_calibration": read_table("modeled", "accuracy", "calibration", S),
         "acc_allstar": read_table("modeled", "accuracy", "allstar_reliability", S),
@@ -117,6 +120,8 @@ grades["equiv_pick"] = C.equivalent_pick(grades["current_median"], CURVE)
 grades["played_like"] = grades["equiv_pick"].map(C.equivalent_pick_label)
 grades["all_time_rank"] = C.all_time_rank(grades)
 CLASSES = C.class_strength(grades, CURVE)
+PICK_VALUE = C.pick_value(CURVE)
+grades = grades.merge(data["metrics"], on="bbref_id", how="left")
 G = grades.set_index("bbref_id")
 options = {label(r): r["bbref_id"] for _, r in grades.iterrows()}
 label_of = {v: k for k, v in options.items()}
@@ -229,6 +234,65 @@ def summary(pid: str) -> None:
         f"**{int(g['all_time_rank'])}** of {len(G):,} picks since 1996 (by career peak). "
         "Both compare across draft classes, unlike the redraft."
     )
+    more_metrics(g)
+
+
+def _fmt_or(v: object, fmt: str, missing: str = "—") -> str:
+    return missing if v is None or pd.isna(v) else format(v, fmt)  # type: ignore[arg-type]
+
+
+def surplus_label(v: object) -> str:
+    """'+$168M'. The backslash keeps Streamlit from reading '$' as the start of math."""
+    if v is None or pd.isna(v):  # type: ignore[arg-type]
+        return "—"
+    x = float(v)  # type: ignore[arg-type]
+    return f"{'+' if x >= 0 else '-'}\\${abs(x):,.0f}M"
+
+
+def more_metrics(g: pd.Series) -> None:
+    with st.expander("More metrics: contract value, development, playoffs, durability"):
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric(
+            "Bust risk (draft night)",
+            _fmt_or(g["projected_p_bust"], ".0%"),
+            help="Draft-night chance his career never reaches rotation level.",
+        )
+        c2.metric(
+            "Rookie-deal surplus",
+            surplus_label(g["surplus_m"]),
+            help="Value produced in his first 4 seasons, priced at what veterans with the same "
+            "production earn, minus what he was paid. In today's dollars ($M).",
+        )
+        c3.metric(
+            "Late bloomer index",
+            _fmt_or(g["late_bloomer"], "+.1f"),
+            help="How much his peak grew from year 3 to year 8 beyond players with the same "
+            "year-3 level (standard units; + = late bloomer, - = early peaker).",
+        )
+        c4.metric(
+            "Playoff riser",
+            _fmt_or(g["playoff_riser"], "+.1f"),
+            help="Playoff minus regular-season box plus-minus in the same seasons, per 100 "
+            "possessions, shrunk toward 0 for small samples (needs 300+ playoff minutes).",
+        )
+        c5.metric(
+            "Second contract",
+            _fmt_or(g["second_pct"], ".0%"),
+            delta=None
+            if pd.isna(g["second_vs_slot"])
+            else f"{g['second_vs_slot'] * 100:+.0f} pts vs slot",
+            help="Best salary as a share of the cap in years 5-7 (the second contract), vs the "
+            "average for his draft slot.",
+        )
+        c6.metric(
+            "Rotation seasons",
+            _fmt_or(g["rotation_seasons"], ".0f"),
+            delta=None if pd.isna(g["availability"]) else f"{g['availability']:.0%} of games",
+            delta_color="off",
+            delta_arrow="off",
+            help="Seasons with 1,000+ minutes; delta = share of team games played when in "
+            "the league.",
+        )
 
 
 # ----------------------------------------------------------------------- pages
@@ -595,7 +659,23 @@ elif page == "player":
         )
     else:
         right.dataframe(
-            pl[["rank", "plays_like_name", "style_similarity", "basis"]],
+            pl[["rank", "plays_like_name", "style_similarity", "style_percentile", "basis"]],
+            column_config={
+                "rank": "#",
+                "plays_like_name": "Plays like",
+                "style_similarity": st.column_config.NumberColumn(
+                    "Style match",
+                    format="percent",
+                    help="How alike the two shot-style mixes are (cosine similarity). Runs "
+                    "high: two random NBA players are about 82% alike.",
+                ),
+                "style_percentile": st.column_config.NumberColumn(
+                    "Closer than",
+                    format="percent",
+                    help="Share of all NBA player pairs that are less alike than this match.",
+                ),
+                "basis": "Based on",
+            },
             hide_index=True,
             width="stretch",
         )
@@ -760,6 +840,137 @@ elif page == "classes":
         st.session_state["goto_class"] = int(table.iloc[event.selection.rows[0]]["draft_year"])  # type: ignore[attr-defined]
         st.rerun()
     st.caption("Click a class to open its redraft.")
+
+elif page == "leaders":
+    theme.hero(
+        "Leaderboards",
+        "Bargains, bloomers and big-game players",
+        "Six ways to rank every pick since 1996 beyond the grade.",
+    )
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        lo, hi = year_range("leader_years", (1996, 2026))
+    rnd = c2.selectbox("Round", ["Both", "1st", "2nd"], key="leader_round")
+    d = grades[grades["draft_year"].between(lo, hi)]
+    if rnd != "Both":
+        d = d[d["round"] == rnd]
+    base = ["bbref_id", "player_name", "draft_year", "pick"]
+    cfg = {
+        "draft_year": st.column_config.NumberColumn("Year", format="%d"),
+        "surplus_m": st.column_config.NumberColumn("Surplus ($M, today)", format="%+.0f"),
+        "late_bloomer": st.column_config.NumberColumn("Late bloomer", format="%+.1f"),
+        "playoff_riser": st.column_config.NumberColumn("Playoff riser", format="%+.1f"),
+        "second_pct": st.column_config.NumberColumn("2nd contract (% cap)", format="percent"),
+        "second_vs_slot": st.column_config.NumberColumn("vs slot", format="percent"),
+        "rotation_seasons": "Rotation seasons",
+        "availability": st.column_config.NumberColumn("Games played", format="percent"),
+        "projected_p_bust": st.column_config.NumberColumn("Bust risk", format="percent"),
+        "projected_p_all_star": st.column_config.NumberColumn("All-Star odds", format="percent"),
+    }
+    boards = {
+        "Bargains": (
+            "surplus_m",
+            "Rookie-contract surplus: production in years 1-4 priced at veteran market "
+            "rates, minus actual pay, in today's dollars. Top picks earn more, but stars on "
+            "rookie deals are the best value in basketball.",
+        ),
+        "Late bloomers": (
+            "late_bloomer",
+            "Peak growth from year 3 to year 8 beyond players with the same year-3 level "
+            "(players in the NBA for 2+ of their first 3 seasons). Sort the other way for "
+            "early peakers.",
+        ),
+        "Playoff risers": (
+            "playoff_riser",
+            "Playoff minus regular-season box plus-minus in the same seasons (per 100 "
+            "possessions), 300+ playoff minutes, shrunk toward 0. Sort the other way for "
+            "players who fade in the playoffs.",
+        ),
+        "Second contracts": (
+            "second_vs_slot",
+            "Best salary in years 5-7 as a share of the cap, minus the average for his slot: "
+            "how teams valued him when the rookie deal ended.",
+        ),
+        "Durability": (
+            "rotation_seasons",
+            "Seasons with 1,000+ minutes, with the share of team games played.",
+        ),
+        "Bust risk": (
+            "projected_p_bust",
+            "Draft-night chance a career never reaches rotation level, from the draft-slot "
+            "model. Highest risk first; pick a single class with the year slider.",
+        ),
+    }
+    tabs = st.tabs(list(boards))
+    for tab, (col, note) in zip(tabs, boards.values(), strict=True):
+        with tab:
+            st.caption(note)
+            flip = st.toggle("Reverse order", key=f"flip_{col}")
+            extra = {
+                "second_vs_slot": ["second_pct", "second_vs_slot"],
+                "rotation_seasons": ["rotation_seasons", "availability"],
+                "projected_p_bust": ["projected_p_bust", "projected_p_all_star"],
+            }.get(col, [col])
+            rows = d.dropna(subset=[col]).sort_values(col, ascending=flip).head(30)
+            clickable(rows[[*base, *extra, "grade"]], key=f"lb_{col}", column_config=cfg)
+    st.caption("Click a row to open that player's card.")
+
+elif page == "pickvalue":
+    theme.hero(
+        "Pick value",
+        "What is each pick worth?",
+        "Every slot's average career value since 1996, with the #1 pick = 100.",
+    )
+    pv = PICK_VALUE.copy()
+    st.caption(
+        "Average best-3-season career value by pick (classes 1996-2017, smoothed so it never "
+        "rises with pick number), scaled so the #1 pick = 100. The drop is steep: a #10 pick "
+        "is worth well under half of a #1, and late second-rounders a small fraction."
+    )
+    fig = px.area(
+        pv,
+        x="pick",
+        y="value",
+        labels={"pick": "Pick", "value": "Value (#1 = 100)"},
+        height=380,
+    )
+    fig.update_traces(line={"color": theme.BLUE, "width": 3}, fillcolor="rgba(10,132,255,0.18)")
+    for p in (1, 5, 10, 20, 30, 45):
+        v = float(pv.loc[pv["pick"] == p, "value"].iloc[0])
+        fig.add_annotation(
+            x=p,
+            y=v,
+            text=f"#{p}: {v:.0f}",
+            showarrow=True,
+            arrowhead=0,
+            ay=-28,
+            font={"color": theme.TEXT},
+        )
+    st.plotly_chart(fig, width="stretch")
+
+    st.markdown("### Trade calculator")
+    st.caption("Which side of a pick swap is worth more, on average?")
+    picks = list(range(1, 61))
+    a, b = st.columns(2)
+    side_a = a.multiselect("Side A gets", picks, default=[5], key="trade_a")
+    side_b = b.multiselect("Side B gets", picks, default=[12, 20], key="trade_b")
+    val = pv.set_index("pick")["value"]
+    va, vb = float(val.reindex(side_a).sum()), float(val.reindex(side_b).sum())
+    a.metric("Side A value", f"{va:.0f}")
+    b.metric("Side B value", f"{vb:.0f}")
+    if va or vb:
+        lead, diff = ("A", va - vb) if va >= vb else ("B", vb - va)
+        st.markdown(
+            f"**Side {lead} wins by {diff:.0f}** "
+            f"(about the value of pick #{int(val[val <= max(diff, 0.01)].index.min())})."
+            if diff > 0
+            else "**Even trade.**"
+        )
+    st.dataframe(
+        pv[["pick", "value"]].T.round(0).astype(int),
+        width="stretch",
+        hide_index=False,
+    )
 
 elif page == "steals":
     theme.hero(
