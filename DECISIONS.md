@@ -442,3 +442,28 @@ Not pre-registered, so a hypothesis only: among 15 shot features, shrunken rim F
 - **Guess the pick:** a game on finished careers.
 
 **Rim-finishing confirmation (D029):** `eval/rim_confirmation.py` implements the pre-registered tests exactly and runs inside `draft-dna grade`. It writes only a status until a cohort class has year-4 outcomes: 2023 → after 2026-27, through 2026 → after 2029-30 (185 cohort players). No interim results are computed or shown. A dry run on already-used 2019–20 classes was used only to check that the code runs.
+
+### D042: Were draft-night pick trades worth it?
+
+**Data:** every trade that moved a drafted player between draft day and his first season (the D036 window), parsed from cached Basketball-Reference transaction logs with no new requests.
+- **Splitting the deal:** the traded player plus anyone listed "with" him go to the receiving team. Everything after "for" comes back.
+- **Future picks** count as the player they became ("… was later selected").
+- **Deduplication:** each deal appears on every involved player's page, so trades are keyed by date, team pair and players.
+
+**Value:** each asset's best 3-season stretch (season value incl. playoffs) from the first season after the trade, so a veteran counts only for post-trade play.
+
+**Verdict:**
+- **Perspective:** the "buyer" is the team that received the best-drafted player from that draft.
+- **Thresholds:** worth it if value got − value given > 0.25, not worth it if < −0.25, otherwise even.
+- **Not scored:** three-team deals and pick-swap rights (they can't be split into two clean sides; a swap's "later selected" player isn't an asset either side received), plus deals with pre-1996 players or unresolved future picks.
+- **Result:** 236 scored trades among classes ≤ 2021; 116 of all trades could not be scored.
+
+**Results (classes ≤ 2021):**
+- **Overall:** 33% worth it, 38% even, 29% not worth it.
+- **By the best pick acquired:** picks 1–5: 50/0/50 (n = 14); 6–14: 46/11/43 (n = 28); 15–30: 46/16/37 (n = 67); 2nd round: 21/59/20 (n = 127).
+- **Best deals:** OKC (Oladipo, Sabonis, Ilyasova for Ibaka, 2016), LAC (SGA, 2018), UTA (Gobert for Erick Green, 2013).
+- **Worst deals:** MIL (Traylor for Dirk + Garrity, 1998), MEM (Mayo package for Love + Miller, 2008).
+- **Limits:**
+  - Small samples at the top: 14 trades involved picks 1–5.
+  - Value ignores fit, salary and championships.
+  - Excluding complex deals may bias toward simple swaps.

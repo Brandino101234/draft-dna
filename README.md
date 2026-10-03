@@ -346,7 +346,7 @@ Each card shows the prospect's college shot map next to his top-3 comps' maps. I
 NBA early-career shot maps are projected into the same six college shot styles. Each prospect gets the five nearest NBA players by style mix, within 3 inches of his height. This is a description of shot diet only: Phase 5 showed style doesn't predict success.
 
 ### The app
-`make app` opens a Streamlit app with eighteen pages:
+`make app` opens a Streamlit app with nineteen pages:
 - **Home:** the headline findings in ten seconds, with links into each page and featured prospects
 - **How accurate is it?:** held-out calibration (23.6% below floor, 9.8% above ceiling), every model vs draft slot, how the forecast sharpens by season, and where it misses (All-Star odds for top picks run high)
 - **Player card:** pick a draft class or type a name; card, plain-language tier and All-Star odds, comps (click one to open its card) and the whole class
@@ -359,6 +359,7 @@ NBA early-career shot maps are projected into the same six college shot styles. 
 - **Steals & busts:** biggest moves between draft slot and redraft position, by year range and round
 - **Teams:** each franchise's picks against their slots (no detectable skill, per Phase 6, so read it as history)
 - **Recruits:** did teams misjudge high-school recruiting rank? (no), plus unranked stars and top-recruit misses
+- **Pick trades:** was trading for a pick on draft night worth it? Value each side got after the trade: first-round buys are about a coin flip, second-round deals mostly a wash; best and worst deals ever (Dirk for Traylor)
 - **Leaderboards:** rookie-contract bargains (surplus in today's dollars), late bloomers, playoff risers, second contracts vs slot, durability, and draft-night bust risk
 - **Pick value:** what each slot is worth (#1 = 100) with a trade calculator
 - **Compare:** two players side by side
