@@ -200,11 +200,14 @@ def grade_all(s: Settings, meas: dict[int, B.Measurement] | None = None) -> pd.D
         all_nba=("all_nba_team", lambda x: int(x.notna().sum())),
         first_team=("all_nba_team", lambda x: int((x == "1st").sum())),
         mvps=("won_mvp", "sum"),
+        finals_mvps=("won_finals_mvp", "sum"),
     )
     hon = hon.reindex(out.index).fillna(0)
     honors = [
-        honor_tier(a, f, m)
-        for a, f, m in zip(hon["all_nba"], hon["first_team"], hon["mvps"], strict=True)
+        honor_tier(a, f, m, fm)
+        for a, f, m, fm in zip(
+            hon["all_nba"], hon["first_team"], hon["mvps"], hon["finals_mvps"], strict=True
+        )
     ]
     out["honor_tier"] = honors
     out["current_tier"] = [h or t for h, t in zip(honors, out["current_tier"], strict=True)]

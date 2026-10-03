@@ -189,6 +189,15 @@ def ingest_awards(fetcher: Fetcher, seasons: Iterable[int]) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def ingest_finals_mvp(fetcher: Fetcher) -> pd.DataFrame:
+    """Finals MVP history (one page): season (end year) and player."""
+    html = fetcher.get(f"{BASE}/awards/finals_mvp.html", max_age=IN_SEASON_MAX_AGE)
+    df = parse_table(html, "finals_mvp_NBA")
+    df = df[df["player__id"].notna()].copy()
+    df["season"] = df["season"].str[:4].astype(int) + 1  # "2025-26" -> 2026
+    return df[["season", "player__id"]].rename(columns={"player__id": "bbref_id"})
+
+
 def ingest_all_stars(fetcher: Fetcher, seasons: Iterable[int]) -> pd.DataFrame:
     """All-Star rosters (one table per All-Star team; 1999 had no game)."""
     frames = []

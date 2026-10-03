@@ -32,10 +32,12 @@ HONOR_TIERS = ["Superstar", "MVP", "Legend"]
 ALL_TIERS = TIERS + HONOR_TIERS
 
 
-def honor_tier(all_nba: float, first_team: float, mvps: float) -> str | None:
-    """Legend: 2+ MVPs or 10+ All-NBA selections. MVP: won one. Superstar: 2+ All-NBA
-    First Team selections. None otherwise."""
-    if mvps >= 2 or all_nba >= 10:
+def honor_tier(
+    all_nba: float, first_team: float, mvps: float, finals_mvps: float = 0
+) -> str | None:
+    """Legend: 2+ MVPs, 2+ Finals MVPs or 10+ All-NBA selections. MVP: won one.
+    Superstar: 2+ All-NBA First Team selections. None otherwise."""
+    if mvps >= 2 or finals_mvps >= 2 or all_nba >= 10:
         return "Legend"
     if mvps >= 1:
         return "MVP"
