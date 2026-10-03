@@ -29,29 +29,51 @@ if not (ROOT / "data" / "modeled" / "grading" / "grades.parquet").exists():
     os.environ.setdefault("DRAFT_DNA_MODELED", str(ROOT / "app" / "bundle"))
 
 
-def _code_and_data_changed() -> bool:
-    """Streamlit Cloud reruns app.py after a git push but keeps already-imported modules
-    and cached data in memory, so new code could call old modules (AttributeError) and a
-    refreshed bundle could keep showing old numbers. Fingerprint the project code and the
-    data bundle; when they change, drop the stale modules (the caches are cleared below)."""
-    watched = [
-        *(ROOT / "src" / "draft_dna").rglob("*.py"),
-        ROOT / "app" / "theme.py",
-        *(ROOT / "app" / "bundle").rglob("*.parquet"),
-    ]
+def _is_project(name: str) -> bool:
+    return name == "theme" or name == "draft_dna" or name.startswith("draft_dna.")
+
+
+def _mtime(module: object) -> int | None:
+    f = getattr(module, "__file__", None)
+    return os.stat(f).st_mtime_ns if f and os.path.exists(f) else None
+
+
+def _drop_stale_modules() -> bool:
+    """Streamlit Cloud reruns app.py after a git push but keeps already-imported modules in
+    memory, so new code could call old modules (AttributeError). Project modules are
+    stamped with their file's mtime; an outdated stamp, or project modules present the
+    first time this code runs in a process (loaded by older code), means a deploy
+    happened: drop all project modules so they re-import from the new files."""
+    loaded = [m for n, m in list(sys.modules.items()) if _is_project(n) and m is not None]
+    if os.environ.get("DRAFT_DNA_STAMPING") is None:
+        stale = bool(loaded)  # this code never ran in this process: modules are from old code
+    else:  # unstamped = imported lazily during a run (stamped below), not stale
+        stale = any(hasattr(m, "__dd_mtime__") and m.__dd_mtime__ != _mtime(m) for m in loaded)
+    os.environ["DRAFT_DNA_STAMPING"] = "1"
+    if stale:
+        for name in [n for n in sys.modules if _is_project(n)]:
+            del sys.modules[name]
+    return stale
+
+
+def _stamp_modules() -> None:
+    for name, m in list(sys.modules.items()):
+        if _is_project(name) and m is not None:
+            m.__dd_mtime__ = _mtime(m)  # type: ignore[attr-defined]
+
+
+def _bundle_changed() -> bool:
+    """A refreshed data bundle (same code) must not keep serving cached old numbers."""
+    files = sorted((ROOT / "app" / "bundle").rglob("*.parquet"))
     sig = hashlib.sha1(
-        "|".join(f"{p}:{p.stat().st_mtime_ns}:{p.stat().st_size}" for p in sorted(watched)).encode()
+        "|".join(f"{p}:{p.stat().st_mtime_ns}:{p.stat().st_size}" for p in files).encode()
     ).hexdigest()
-    previous = os.environ.get("DRAFT_DNA_CODE_DATA_SIG")
-    os.environ["DRAFT_DNA_CODE_DATA_SIG"] = sig
-    if previous is None or previous == sig:
-        return False
-    for name in [m for m in sys.modules if m == "theme" or m.startswith("draft_dna")]:
-        del sys.modules[name]
-    return True
+    previous = os.environ.get("DRAFT_DNA_BUNDLE_SIG")
+    os.environ["DRAFT_DNA_BUNDLE_SIG"] = sig
+    return previous is not None and previous != sig
 
 
-STALE = _code_and_data_changed()
+STALE = _drop_stale_modules() | _bundle_changed()
 
 from draft_dna.config import get_settings  # noqa: E402
 from draft_dna.grading import classes as C  # noqa: E402
@@ -60,6 +82,8 @@ from draft_dna.viz import cards as card_viz  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "app"))
 import theme  # noqa: E402
+
+_stamp_modules()
 
 st.set_page_config(page_title="Draft DNA", page_icon="🏀", layout="wide")
 theme.apply()
